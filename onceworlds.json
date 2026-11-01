@@ -1,29 +1,36 @@
 {
   "slug": "itsy-bitsy-spider",
   "name": "Itsy Bitsy Spider",
-  "description": "Climb the waterspout. Hold on when the rain comes down. First to the sun wins.",
-  "dir": "game",
+  "description": "Race up the waterspout. Grip tight when the flush comes down, swing on silk, snap up golden flies, and be first to the sun.",
+  "dir": "dist",
   "productionBranch": "main",
   "genre": "Obby",
   "icon": "store/icon.png",
   "thumbnails": ["store/thumb-1.png", "store/thumb-2.png", "store/thumb-3.png", "store/thumb-4.png"],
   "controls": [
-    { "keys": ["Arrows", "WASD", "Stick"], "action": "Climb along any surface (Up climbs)" },
-    { "keys": ["J", "Shift", "Hold button"], "action": "Hold on through the water" },
-    { "keys": ["Space", "K", "Jump button"], "action": "Jump toward the stick" },
+    { "keys": ["Arrows", "WASD", "Stick"], "action": "Climb along any surface" },
+    { "keys": ["J", "Shift", "Hold button"], "action": "Grip through the flush" },
+    { "keys": ["Space", "K", "Jump button"], "action": "Jump (hold to go higher)" },
+    { "keys": ["Space", "K", "Jump button"], "action": "In the air near a bolt: shoot silk" },
     { "keys": ["Esc", "P"], "action": "Pause a solo climb" },
     { "keys": ["Enter", "Space", "Tap"], "action": "Play, and pick in menus" }
   ],
+  "data": {
+    "held-today": { "type": "counter", "add": [1, 20], "reset": "daily" },
+    "monsoon-today": { "type": "list", "max": 100, "bytes": 64 }
+  },
   "badges": [
     { "id": "first-climb", "name": "First Climb", "description": "Reach the sun on any spout.", "icon": "store/badge-first-climb.png" },
-    { "id": "hold-on", "name": "Hold On", "description": "Hold through 10 flushes.", "icon": "store/badge-hold-on.png" },
+    { "id": "hold-on", "name": "Hold On", "description": "Grip through 10 flushes.", "icon": "store/badge-hold-on.png" },
+    { "id": "perfect-hold", "name": "Perfect Grip", "description": "Grip just as the flush hits, 25 times.", "icon": "store/badge-perfect-hold.png" },
     { "id": "washed-out", "name": "Washed Out", "description": "Get washed down 10 m in one go.", "icon": "store/badge-washed-out.png" },
     { "id": "out-came-the-sun", "name": "Out Came the Sun", "description": "Win a race.", "icon": "store/badge-out-came-the-sun.png" },
-    { "id": "up-the-spout-again", "name": "Up the Spout Again", "description": "Win a race after being washed out in it.", "icon": "store/badge-up-the-spout-again.png" },
+    { "id": "up-the-spout-again", "name": "Up the Spout Again", "description": "Win a race after being washed down in it.", "icon": "store/badge-up-the-spout-again.png" },
     { "id": "cup-winner", "name": "Cup Winner", "description": "Win a cup.", "icon": "store/badge-cup-winner.png" },
     { "id": "no-washouts", "name": "Bone Dry", "description": "Climb a spout without being washed down once.", "icon": "store/badge-no-washouts.png" },
     { "id": "twelve-spouts", "name": "Twelve Spouts", "description": "Climb all twelve spouts.", "icon": "store/badge-twelve-spouts.png" },
     { "id": "all-stars", "name": "Thirty-Six Stars", "description": "Earn every star.", "icon": "store/badge-all-stars.png" },
+    { "id": "golden-flies", "name": "Golden Flies", "description": "Catch the golden fly on every spout.", "icon": "store/badge-golden-flies.png" },
     { "id": "monsoon-100", "name": "Monsoon 100", "description": "Reach 100 m in Monsoon.", "icon": "store/badge-monsoon-100.png" }
   ]
 }
