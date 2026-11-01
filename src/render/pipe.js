@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { Geo, offsetLine, cumLen } from './geo.js';
 import { pbr, plain, canvasTex, rand } from './tex.js';
+import { zincMat, edgeMat } from './zinc.js';
 import { DEPTH, WALL_T, RING_H } from '../sim/config.js';
 
 export const D2 = DEPTH / 2;
@@ -26,7 +27,8 @@ export function buildPipe(level, theme = {}) {
   const H = level.H;
   const rnd = rand(Math.round(H) * 31 + level.pieces.length);
   const zinc = zincMat();
-  const zincIn = pbr('Metal021', { tile: 420, metal: 0.5, rough: 0.7, color: new THREE.Color(1.5, 1.65, 1.75), env: 1.0, normal: 0.6, key: 'zincIn' });
+  const zincWall = zincMat({ key: 'zincWall', along: true, vertexColors: true, color: new THREE.Color(1.15, 1.2, 1.25) });
+  const zincIn = zincMat({ key: 'zincIn', metal: 0.55, rough: 0.8, color: new THREE.Color(0.6, 0.66, 0.72), env: 0.8 });
   const edge = plain('zincEdge', { color: 0xe8eef0, metalness: 1, roughness: 0.28, envMapIntensity: 1.4 });
   const iron = pbr('MetalPlates013', { tile: 220, metal: 1, rough: 0.9, color: 0x8a7f78, env: 0.8 });
 
@@ -37,7 +39,13 @@ export function buildPipe(level, theme = {}) {
 
   // ---- side walls
   const walls = new Geo(true);
-  const edges = new Geo();
+  const edges = new Geo(true);
+  // across the cut edge, from the inside out: a bright rolled bead, the dull cut face, a darker outer lip
+  const EDGE = [
+    [0, 3.5, [1.25, 1.28, 1.3, 1], [1.0, 1.03, 1.05, 1]],
+    [3.5, WALL_T - 3, [0.62, 0.65, 0.68, 1], [0.55, 0.58, 0.61, 1]],
+    [WALL_T - 3, WALL_T, [0.42, 0.44, 0.46, 1], [0.3, 0.31, 0.33, 1]],
+  ];
   const AO0 = [0.36, 0.38, 0.42, 1];
   const AO1 = [0.86, 0.87, 0.88, 1];
   const ONE = [1, 1, 1, 1];
@@ -60,8 +68,18 @@ export function buildPipe(level, theme = {}) {
       const oa = out[i];
       const ob = out[i + 1];
       walls.faceAuto([[oa[0], oa[1], -D2 - WALL_T], [ob[0], ob[1], -D2 - WALL_T], [ob[0], ob[1], D2], [oa[0], oa[1], D2]], [-nx, -ny, 0], [[co[i], -D2], [co[i + 1], -D2], [co[i + 1], D2], [co[i], D2]], [AO1, AO1, ONE, ONE]);
-      // the cut edge at the front
-      edges.faceAuto([[a[0], a[1], D2], [b[0], b[1], D2], [ob[0], ob[1], D2], [oa[0], oa[1], D2]], [0, 0, 1], [[a[0], a[1]], [b[0], b[1]], [ob[0], ob[1]], [oa[0], oa[1]]]);
+    }
+    // the cut edge at the front, in three strips
+    for (const [d0, d1, c0, c1] of EDGE) {
+      const i0 = d0 ? offsetLine(inn, -inward * d0) : inn;
+      const i1 = offsetLine(inn, -inward * d1);
+      for (let i = 0; i < inn.length - 1; i++) {
+        const p = i0[i];
+        const q = i0[i + 1];
+        const u = i1[i + 1];
+        const v = i1[i];
+        edges.faceAuto([[p[0], p[1], D2], [q[0], q[1], D2], [u[0], u[1], D2], [v[0], v[1], D2]], [0, 0, 1], [[p[0], p[1]], [q[0], q[1]], [u[0], u[1]], [v[0], v[1]]], [c0, c0, c1, c1]);
+      }
     }
     // bottom end
     const a = inn[0];
@@ -70,10 +88,10 @@ export function buildPipe(level, theme = {}) {
   }
   wall(leftIn, leftOut, -1);
   wall(rightIn, rightOut, 1);
-  const wallMesh = new THREE.Mesh(walls.build(420), withVertexColors(zinc, 'zincV'));
+  const wallMesh = new THREE.Mesh(walls.build(420), zincWall);
   wallMesh.castShadow = true;
   wallMesh.receiveShadow = true;
-  const edgeMesh = new THREE.Mesh(edges.build(1), edge);
+  const edgeMesh = new THREE.Mesh(edges.build(1), edgeMat());
   edgeMesh.receiveShadow = true;
   group.add(wallMesh, edgeMesh);
 
@@ -204,22 +222,6 @@ export function buildPipe(level, theme = {}) {
   group.add(gutterMesh(level, theme));
 
   return { group, outline: { leftIn, rightIn, leftOut, rightOut } };
-}
-
-/** Galvanised zinc: the texture's blue-grey lifted to a bright metal. */
-export function zincMat() {
-  return pbr('Metal021', { tile: 420, metal: 0.85, rough: 0.6, color: new THREE.Color(2.3, 2.45, 2.55), env: 1.2, normal: 0.7, key: 'zinc' });
-}
-
-const vcMats = new Map();
-function withVertexColors(m, key) {
-  let c = vcMats.get(key);
-  if (!c) {
-    c = m.clone();
-    c.vertexColors = true;
-    vcMats.set(key, c);
-  }
-  return c;
 }
 
 // ------------------------------------------------------------------------------------------------ islands

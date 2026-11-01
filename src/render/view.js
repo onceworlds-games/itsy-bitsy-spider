@@ -16,11 +16,11 @@ import { DEPTH } from '../sim/config.js';
 const D2 = DEPTH / 2;
 
 const HOUR = {
-  day: { sun: [1.0, 0.94, 0.84], sunI: 3.1, sky: [0.75, 0.85, 1.0], ground: [0.32, 0.28, 0.22], hemiI: 1.0, exposure: 1.0, warm: 0.04, night: 0 },
-  dawn: { sun: [1.0, 0.8, 0.6], sunI: 2.8, sky: [0.8, 0.78, 0.9], ground: [0.32, 0.24, 0.2], hemiI: 0.9, exposure: 1.02, warm: 0.08, night: 0 },
-  dusk: { sun: [1.0, 0.66, 0.4], sunI: 2.6, sky: [0.55, 0.6, 0.85], ground: [0.3, 0.2, 0.16], hemiI: 0.75, exposure: 1.05, warm: 0.1, night: 0.15 },
-  night: { sun: [0.55, 0.65, 1.0], sunI: 0.9, sky: [0.22, 0.28, 0.45], ground: [0.1, 0.09, 0.1], hemiI: 0.55, exposure: 1.25, warm: -0.02, night: 1 },
-  storm: { sun: [0.75, 0.8, 0.95], sunI: 1.4, sky: [0.4, 0.46, 0.56], ground: [0.16, 0.15, 0.14], hemiI: 0.7, exposure: 1.12, warm: -0.03, night: 0.3 },
+  day: { sun: [1.0, 0.94, 0.84], sunI: 3.1, dir: [-0.32, 0.78, 0.54], sky: [0.75, 0.85, 1.0], ground: [0.32, 0.28, 0.22], hemiI: 1.0, env: 0.75, exposure: 1.0, warm: 0.04, night: 0, fog: [0.7, 0.76, 0.82] },
+  dawn: { sun: [1.0, 0.72, 0.52], sunI: 3.0, dir: [0.62, 0.42, 0.66], sky: [0.78, 0.74, 0.92], ground: [0.3, 0.22, 0.2], hemiI: 0.75, env: 0.55, exposure: 1.04, warm: 0.08, night: 0.05, fog: [0.78, 0.7, 0.74] },
+  dusk: { sun: [1.0, 0.56, 0.3], sunI: 3.2, dir: [-0.66, 0.36, 0.66], sky: [0.5, 0.52, 0.8], ground: [0.26, 0.17, 0.14], hemiI: 0.6, env: 0.42, exposure: 1.06, warm: 0.1, night: 0.2, fog: [0.55, 0.46, 0.52] },
+  night: { sun: [0.5, 0.62, 1.0], sunI: 0.75, dir: [0.42, 0.72, 0.56], sky: [0.16, 0.2, 0.36], ground: [0.06, 0.05, 0.06], hemiI: 0.42, env: 0.12, exposure: 1.12, warm: -0.02, night: 1, fog: [0.08, 0.1, 0.16] },
+  storm: { sun: [0.75, 0.8, 0.95], sunI: 1.4, dir: [-0.2, 0.85, 0.5], sky: [0.4, 0.46, 0.56], ground: [0.16, 0.15, 0.14], hemiI: 0.7, env: 0.38, exposure: 1.12, warm: -0.03, night: 0.3, fog: [0.36, 0.4, 0.46] },
 };
 
 export function createView(host, opts = {}) {
@@ -63,6 +63,7 @@ export function createView(host, opts = {}) {
     scene.add(world.group, water.mesh, flies.group, debris.group, birds.group);
     sky.setTheme(world.theme);
     cur = { run, world, water, flies, debris, birds, rigs: new Map(), hour: HOUR[world.theme.time] ?? HOUR.day };
+    sunDir.set(...cur.hour.dir).normalize();
     fx.clear();
     silk.hideAll();
   }
@@ -116,7 +117,7 @@ export function createView(host, opts = {}) {
     L.hemi.groundColor.setRGB(hr.ground[0], hr.ground[1], hr.ground[2]);
     L.hemi.intensity = hr.hemiI * (1 - g * 0.25) + flash * 3;
     L.fill.intensity = 0.35 + g * 0.2;
-    stage.scene.environmentIntensity = 0.75 * (1 - g * 0.35) * (hr.night ? 0.7 : 1) + flash;
+    stage.scene.environmentIntensity = hr.env * (1 - g * 0.35) + flash;
     const gu = stage.grade;
     gu.exposure.value = hr.exposure * (1 + mood.sunny * 0.08) * (1 - g * 0.06);
     const warm = hr.warm * (1 - g) + mood.sunny * 0.05 - g * 0.05;
@@ -128,7 +129,7 @@ export function createView(host, opts = {}) {
     gu.flash.value = juice.flash * 0.35;
     gu.flashColor.value.copy(juice.flashColor);
     gu.aberr.value = juice.trauma * 1.5;
-    scene.fog.color.setRGB(0.5 + 0.2 * (1 - g), 0.56 + 0.2 * (1 - g), 0.64 + 0.18 * (1 - g)).multiplyScalar(hr.night ? 0.35 : 1);
+    scene.fog.color.setRGB(hr.fog[0], hr.fog[1], hr.fog[2]).lerp(tmpColor.setRGB(0.4, 0.46, 0.54).multiplyScalar(hr.night ? 0.4 : 1), g * 0.7);
     sky.uniforms.storm.value = Math.min(1, g * 1.1 + (run.def.lightning ? 0.15 : 0));
     sky.uniforms.night.value = hr.night;
     sky.uniforms.flash.value = flash;

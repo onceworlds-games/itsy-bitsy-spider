@@ -13,11 +13,11 @@ const H0 = 6.2; // body height above the surface (rig units)
 
 // species shapes: body radii, leg lengths and thickness
 export const SPECIES = {
-  jumper: { ceph: [7, 5, 5.8], abd: [8.5, 6.2, 6.6], femur: [10, 8.5, 8, 9.5], tibia: [9.5, 8.5, 8.5, 10], thick: [1.3, 1.0, 0.95, 1.0], eyes: 1, fuzz: 1 },
-  peacock: { ceph: [6.4, 4.6, 5.4], abd: [7.6, 4.4, 7.4], femur: [9, 8, 9.5, 9], tibia: [9, 8, 10, 9.5], thick: [1.05, 0.95, 1.1, 0.95], eyes: 1, fuzz: 0.8, fan: true },
-  orb: { ceph: [5.6, 4.2, 4.8], abd: [10.5, 9.5, 9.5], femur: [11, 10, 8, 10], tibia: [11, 10, 8.5, 10.5], thick: [0.85, 0.8, 0.75, 0.8], eyes: 0.6, fuzz: 0.3 },
-  tarantula: { ceph: [7.8, 4.8, 6.6], abd: [9, 7, 7.4], femur: [10.5, 9.5, 9, 10.5], tibia: [10, 9, 9, 10.5], thick: [1.7, 1.6, 1.55, 1.6], eyes: 0.45, fuzz: 2 },
-  longlegs: { ceph: [4.2, 3.4, 4], abd: [5.6, 4.6, 4.8], femur: [16, 15, 14, 16], tibia: [17, 16, 15, 17], thick: [0.55, 0.5, 0.5, 0.55], eyes: 0.6, fuzz: 0, tall: 1.7 },
+  jumper: { ceph: [7.4, 5.4, 6.2], abd: [8.6, 6.4, 6.8], femur: [10, 8.5, 8, 9.5], tibia: [9.5, 8.5, 8.5, 10], thick: [1.85, 1.4, 1.3, 1.4], eyes: 1, fuzz: 1 },
+  peacock: { ceph: [6.8, 4.9, 5.8], abd: [7.8, 4.6, 7.6], femur: [9, 8, 9.5, 9], tibia: [9, 8, 10, 9.5], thick: [1.45, 1.3, 1.5, 1.3], eyes: 1, fuzz: 0.8, fan: true },
+  orb: { ceph: [5.8, 4.4, 5], abd: [10.5, 9.5, 9.5], femur: [11, 10, 8, 10], tibia: [11, 10, 8.5, 10.5], thick: [1.15, 1.1, 1.0, 1.1], eyes: 0.7, fuzz: 0.4 },
+  tarantula: { ceph: [8, 5, 6.8], abd: [9.2, 7.2, 7.6], femur: [10.5, 9.5, 9, 10.5], tibia: [10, 9, 9, 10.5], thick: [2.2, 2.0, 1.95, 2.0], eyes: 0.55, fuzz: 2 },
+  longlegs: { ceph: [4.6, 3.8, 4.4], abd: [6, 5, 5.2], femur: [16, 15, 14, 16], tibia: [17, 16, 15, 17], thick: [0.8, 0.75, 0.75, 0.8], eyes: 0.7, fuzz: 0.2, tall: 1.7 },
 };
 
 const ROOTS = [
@@ -49,7 +49,7 @@ const tmp = {
 };
 
 const legGeo = (() => {
-  const g = new THREE.CylinderGeometry(0.72, 1, 1, 7, 1);
+  const g = new THREE.CylinderGeometry(0.7, 1, 1, 10, 1);
   g.translate(0, 0.5, 0);
   return g;
 })();
@@ -139,22 +139,119 @@ function patternTex(look) {
   });
 }
 
-function fuzzMat(color, map, fuzz) {
-  return new THREE.MeshPhysicalMaterial({
-    color,
-    map: map ?? null,
-    roughness: 0.75,
-    metalness: 0,
-    sheen: 0.6 + 0.4 * Math.min(1, fuzz),
-    sheenRoughness: 0.45,
-    sheenColor: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.55),
-    clearcoat: 0.1,
-    envMapIntensity: 0.9,
-  });
+// a fine speckle the light catches like short hair
+function furBump() {
+  return canvasTex('furBump', 128, 128, (ctx, w, h) => {
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, w, h);
+    for (let k = 0; k < 2600; k++) {
+      const v = Math.random() < 0.5 ? 40 + Math.random() * 60 : 170 + Math.random() * 80;
+      ctx.strokeStyle = `rgba(${v},${v},${v},0.7)`;
+      ctx.lineWidth = 1;
+      const x = Math.random() * w;
+      const y = Math.random() * h;
+      const a = Math.PI / 2 + (Math.random() - 0.5) * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * 3, y + Math.sin(a) * 3);
+      ctx.stroke();
+    }
+  }, { linear: true, repeat: true });
 }
 
-const eyeMat = new THREE.MeshPhysicalMaterial({ color: 0x050608, roughness: 0.04, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.4 });
-const glintMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 4, 4) });
+function fuzzMat(color, map, fuzz) {
+  const c = new THREE.Color(color);
+  const m = new THREE.MeshPhysicalMaterial({
+    color: c,
+    map: map ?? null,
+    roughness: 0.82,
+    metalness: 0,
+    bumpMap: furBump(),
+    bumpScale: 0.6 + fuzz * 0.4,
+    sheen: 0.25 + 0.2 * Math.min(1, fuzz),
+    sheenRoughness: 0.55,
+    sheenColor: (map ? new THREE.Color(0xd8d0c4) : c.clone()).lerp(new THREE.Color(0xffffff), 0.25),
+    envMapIntensity: 0.8,
+  });
+  return m;
+}
+
+const eyeMat = new THREE.MeshPhysicalMaterial({ color: 0x030304, roughness: 0.05, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.2 });
+const glintMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 3.2, 3.2), toneMapped: false });
+const hairGeo = (() => {
+  const g = new THREE.ConeGeometry(0.2, 1.5, 3, 1);
+  g.translate(0, 0.6, 0);
+  return g;
+})();
+
+/** A jumping spider's head: a rounded box, its front a flat face for the eyes, a little narrower at the back. */
+function headGeo(r) {
+  const g = new THREE.SphereGeometry(1, 36, 24);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i);
+    let y = p.getY(i);
+    let z = p.getZ(i);
+    const n = 3.2;
+    const d = Math.pow(Math.abs(x) ** n + Math.abs(y) ** n + Math.abs(z) ** n, 1 / n);
+    x = x * 0.45 + (x / d) * 0.55;
+    y = y * 0.45 + (y / d) * 0.55;
+    z = z * 0.45 + (z / d) * 0.55;
+    if (x > 0.78) x = 0.78 + (x - 0.78) * 0.3;
+    if (y < -0.45) y = -0.45 + (y + 0.45) * 0.55;
+    const back = Math.max(0, -x);
+    z *= 1 - back * 0.22;
+    y *= 1 - back * 0.12;
+    p.setXYZ(i, x * r[0], y * r[1], z * r[2]);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/** The abdomen: an egg, fuller at the back. x runs from the tip (-1) to the waist (+1). */
+function abdGeo() {
+  const g = new THREE.SphereGeometry(1, 36, 24);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
+    const k = 1 - x * 0.16;
+    p.setY(i, p.getY(i) * k);
+    p.setZ(i, p.getZ(i) * k);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Short hairs standing out of a mesh's surface (for the fuzzy silhouette). */
+function hairs(geo, scale, n, mat, color, seed) {
+  const im = new THREE.InstancedMesh(hairGeo, mat, n);
+  const pos = geo.attributes.position;
+  const nor = geo.attributes.normal;
+  let s = seed;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const v = new THREE.Vector3();
+  const nn = new THREE.Vector3();
+  const c = new THREE.Color();
+  for (let k = 0; k < n; k++) {
+    let i = Math.floor(rnd() * pos.count);
+    // mostly on the top and sides
+    for (let t = 0; t < 4 && nor.getY(i) < -0.3; t++) i = Math.floor(rnd() * pos.count);
+    v.set(pos.getX(i) * scale[0], pos.getY(i) * scale[1], pos.getZ(i) * scale[2]);
+    nn.set(nor.getX(i) / scale[0], nor.getY(i) / scale[1], nor.getZ(i) / scale[2]).normalize();
+    nn.x -= 0.5; // swept back
+    nn.normalize();
+    q.setFromUnitVectors(tmp.y, nn);
+    const l = 0.6 + rnd() * 0.7;
+    m4.compose(v, q, tmp.s.set(1, l, 1));
+    im.setMatrixAt(k, m4);
+    c.copy(color).offsetHSL(0, 0, (rnd() - 0.4) * 0.18);
+    im.setColorAt(k, c);
+  }
+  im.castShadow = false;
+  return im;
+}
 
 // ------------------------------------------------------------------------------------------- the rig
 
@@ -170,13 +267,16 @@ export function createSpider(look, opts = {}) {
   const scale = VS * (opts.scale ?? 1);
   root.scale.setScalar(scale);
 
-  const base = new THREE.Color(look.color);
-  const legCol = shade(look.color, look.species === 'longlegs' ? 0.7 : 0.55);
-  const cephMat = fuzzMat(shade(look.color, 0.8), null, sp.fuzz);
+  const legCol = shade(look.color, look.species === 'longlegs' ? 0.62 : 0.42);
+  const cephCol = shade(look.color, 0.85);
+  const cephMat = fuzzMat(cephCol, null, sp.fuzz);
   const abdMat = fuzzMat(0xffffff, patternTex(look), sp.fuzz);
-  const legMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.7, sheen: 0.7, sheenColor: legCol.clone().lerp(new THREE.Color(0xffffff), 0.5), sheenRoughness: 0.5 });
+  const legMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.75, bumpMap: furBump(), bumpScale: 0.5, sheen: 0.3, sheenColor: legCol.clone().lerp(new THREE.Color(0xffffff), 0.35), sheenRoughness: 0.6 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
+  const faceMat = fuzzMat(shade(look.color, 0.45), null, sp.fuzz);
+  const mats = [cephMat, abdMat, legMat, hairMat, faceMat];
   if (ghost) {
-    for (const m of [cephMat, abdMat, legMat]) {
+    for (const m of mats) {
       m.transparent = true;
       m.opacity = 0.42;
       m.depthWrite = false;
@@ -187,46 +287,74 @@ export function createSpider(look, opts = {}) {
   const ceph = new THREE.Group();
   ceph.position.set(2.5, 1.0, 0);
   body.add(ceph);
-  const cephMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), cephMat);
-  cephMesh.scale.set(...sp.ceph);
+  const hc = [sp.ceph[0] * 1.08, sp.ceph[1] * 1.12, sp.ceph[2] * 1.1];
+  const hg = headGeo([1, 1, 1]);
+  const cephMesh = new THREE.Mesh(hg, cephMat);
+  cephMesh.scale.set(...hc);
   ceph.add(cephMesh);
-  // a darker cap on top where the eyes sit
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.42), fuzzMat(shade(look.color, 0.5), null, sp.fuzz));
-  cap.scale.set(sp.ceph[0] * 0.98, sp.ceph[1] * 1.02, sp.ceph[2] * 0.98);
-  cap.position.set(0.3, 0.2, 0);
-  if (ghost) Object.assign(cap.material, { transparent: true, opacity: 0.42, depthWrite: false });
+  // the dark eye field on the top front, where the eyes sit
+  const cap = new THREE.Mesh(headGeo([1, 1, 1]), faceMat);
+  cap.scale.set(hc[0] * 0.985, hc[1] * 1.025, hc[2] * 1.02);
+  cap.position.set(0.25, 0.1, 0);
+  const clip = cap.geometry.attributes.position;
+  // keep only the front-top of the cap: squash the rest inside the head
+  for (let i = 0; i < clip.count; i++) {
+    const x = clip.getX(i);
+    const y = clip.getY(i);
+    if (x < 0.15 || y < -0.05) clip.setXYZ(i, x * 0.9, y * 0.9, clip.getZ(i) * 0.9);
+  }
+  cap.geometry.computeVertexNormals();
   ceph.add(cap);
+  if (!ghost && sp.fuzz > 0) ceph.add(hairs(hg, hc, Math.round(140 * sp.fuzz), hairMat, cephCol, 11));
 
-  // eyes: the big front pair, the side pair, the small ones on top
+  // eyes: the big front pair with a ring of fur round each, the side pair, the small ones on top
   const ek = sp.eyes;
   const eyes = new THREE.Group();
   ceph.add(eyes);
-  const fx = sp.ceph[0] * 0.92;
-  const addEye = (x, y, z, r) => {
-    const e = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), ghost ? cephMat : eyeMat);
+  const fx = hc[0] * 0.8;
+  const ringMat = fuzzMat(new THREE.Color(look.second ?? '#F3EDE2').lerp(new THREE.Color(look.color), 0.35), null, 0.5);
+  if (ghost) Object.assign(ringMat, { transparent: true, opacity: 0.42, depthWrite: false });
+  const addEye = (x, y, z, r, big) => {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), ghost ? cephMat : eyeMat);
     e.position.set(x, y, z);
     eyes.add(e);
-    if (!ghost && r > 1) {
-      const g = new THREE.Mesh(new THREE.SphereGeometry(r * 0.22, 8, 6), glintMat);
-      g.position.set(x + r * 0.75, y + r * 0.45, z + r * 0.2);
+    if (big) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 1.0, r * 0.2, 8, 22), ringMat);
+      ring.position.set(x - r * 0.25, y, z);
+      ring.rotation.y = Math.PI / 2;
+      eyes.add(ring);
+    }
+    if (!ghost && r > 0.9) {
+      const g = new THREE.Mesh(new THREE.SphereGeometry(r * (big ? 0.3 : 0.26), 10, 8), glintMat);
+      g.position.set(x + r * 0.62, y + r * 0.55, z + r * 0.38 * Math.sign(z || 1));
       eyes.add(g);
+      if (big) {
+        const g2 = new THREE.Mesh(new THREE.SphereGeometry(r * 0.13, 8, 6), glintMat);
+        g2.position.set(x + r * 0.85, y - r * 0.25, z - r * 0.2 * Math.sign(z || 1));
+        eyes.add(g2);
+      }
     }
     return e;
   };
-  const ame = 2.4 * ek;
-  addEye(fx - 0.6, 1.0, 2.15 * ek, ame);
-  addEye(fx - 0.6, 1.0, -2.15 * ek, ame);
-  addEye(fx - 1.6, 2.4, 4.3, 1.25 * ek);
-  addEye(fx - 1.6, 2.4, -4.3, 1.25 * ek);
-  addEye(fx - 5, sp.ceph[1] * 0.9, 3.6, 0.8);
-  addEye(fx - 5, sp.ceph[1] * 0.9, -3.6, 0.8);
+  const ame = 2.7 * ek;
+  addEye(fx + 0.4, 0.9, 2.45 * ek, ame, true);
+  addEye(fx + 0.4, 0.9, -2.45 * ek, ame, true);
+  addEye(fx - 1.2, 2.9, 4.6, 1.3 * ek);
+  addEye(fx - 1.2, 2.9, -4.6, 1.3 * ek);
+  addEye(fx - 5.5, hc[1] * 0.92, 3.8, 0.8);
+  addEye(fx - 5.5, hc[1] * 0.92, -3.8, 0.8);
+  // a pale moustache of fur under the big eyes
+  const tache = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), ringMat);
+  tache.scale.set(1.4, 1.3, 4.4 * Math.max(0.7, ek));
+  tache.position.set(fx + 0.1, -1.6, 0);
+  ceph.add(tache);
 
   // chelicerae, iridescent
   const chelMat = new THREE.MeshPhysicalMaterial({ color: look.chel ?? 0x1c6a5a, metalness: 0.7, roughness: 0.25, iridescence: 1, iridescenceIOR: 1.6, envMapIntensity: 1.5 });
   for (const s of [-1, 1]) {
     const c = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), chelMat);
     c.scale.set(1.3, 1.9, 1.15);
-    c.position.set(fx - 0.6, -2.4, s * 1.4);
+    c.position.set(fx - 0.2, -3.2, s * 1.4);
     ceph.add(c);
   }
 
@@ -235,11 +363,11 @@ export function createSpider(look, opts = {}) {
   const palpMat = fuzzMat(0xf3ede2, null, 1.5);
   for (const s of [-1, 1]) {
     const pg = new THREE.Group();
-    pg.position.set(fx - 1, -1.2, s * 2.6);
-    const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 3.4, 8), legMat);
+    pg.position.set(fx, -1.6, s * 3.2);
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 3.4, 8), legMat);
     seg.position.y = -1.4;
     seg.rotation.z = 0.5;
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(1.25, 10, 8), palpMat);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(1.35, 10, 8), palpMat);
     tip.position.set(1.4, -3.3, 0);
     pg.add(seg, tip);
     ceph.add(pg);
@@ -250,15 +378,22 @@ export function createSpider(look, opts = {}) {
   const abd = new THREE.Group();
   abd.position.set(-4.2, 1.6, 0);
   body.add(abd);
-  const abdMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 18), abdMat);
+  const ag = abdGeo();
+  const abdMesh = new THREE.Mesh(ag, abdMat);
   abdMesh.scale.set(...sp.abd);
   abdMesh.position.set(-sp.abd[0] * 0.92, sp.abd[1] * 0.18, 0);
   abdMesh.rotation.set(Math.PI / 2, 0, 0); // UV seam underneath, the top at u = 0.75
   abd.add(abdMesh);
+  if (!ghost && sp.fuzz > 0) {
+    const hh = hairs(ag, sp.abd, Math.round(200 * sp.fuzz), hairMat, new THREE.Color(look.color), 23);
+    hh.position.copy(abdMesh.position);
+    hh.rotation.copy(abdMesh.rotation);
+    abd.add(hh);
+  }
   // spinnerets
   const spin = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.2, 8), cephMat);
   spin.rotation.z = Math.PI / 2;
-  spin.position.set(-sp.abd[0] * 1.9, sp.abd[1] * 0.1, 0);
+  spin.position.set(-sp.abd[0] * 1.95, sp.abd[1] * 0.1, 0);
   abd.add(spin);
   // the peacock's fan
   let fan = null;
@@ -317,14 +452,16 @@ export function createSpider(look, opts = {}) {
   const joints = new THREE.InstancedMesh(jointGeo, legMat, legs.length * 2);
   segs.frustumCulled = false;
   joints.frustumCulled = false;
+  // femur dark, tibia banded lighter, the tarsus pale with the colour of the body
   const c1 = legCol.clone();
-  const c2 = legCol.clone().lerp(new THREE.Color(0xf3ede2), 0.55);
+  const c2 = legCol.clone().lerp(new THREE.Color(look.color), 0.55);
+  const c3 = new THREE.Color(look.color).lerp(new THREE.Color(0xf3ede2), 0.3);
   for (let k = 0; k < legs.length; k++) {
     segs.setColorAt(k * 3, c1);
-    segs.setColorAt(k * 3 + 1, c1);
-    segs.setColorAt(k * 3 + 2, c2);
-    joints.setColorAt(k * 2, c2);
-    joints.setColorAt(k * 2 + 1, c1);
+    segs.setColorAt(k * 3 + 1, c2);
+    segs.setColorAt(k * 3 + 2, c3);
+    joints.setColorAt(k * 2, c1);
+    joints.setColorAt(k * 2 + 1, c2);
   }
   root.add(segs, joints);
 
@@ -338,7 +475,7 @@ export function createSpider(look, opts = {}) {
     }
   }
 
-  for (const o of [cephMesh, cap, abdMesh, segs, joints]) {
+  for (const o of [cephMesh, abdMesh, segs, joints]) {
     o.castShadow = !ghost;
     o.receiveShadow = false;
   }
@@ -569,8 +706,8 @@ export function createSpider(look, opts = {}) {
       setSeg(segs, k0 * 3, tmp.c, L.knee, L.t * 1.05);
       setSeg(segs, k0 * 3 + 1, L.knee, L.ankle, L.t * 0.85);
       setSeg(segs, k0 * 3 + 2, L.ankle, foot, L.t * 0.6);
-      setJoint(joints, k0 * 2, L.knee, L.t * 1.1);
-      setJoint(joints, k0 * 2 + 1, L.ankle, L.t * 0.8);
+      setJoint(joints, k0 * 2, L.knee, L.t * 0.86);
+      setJoint(joints, k0 * 2 + 1, L.ankle, L.t * 0.66);
     }
     segs.instanceMatrix.needsUpdate = true;
     joints.instanceMatrix.needsUpdate = true;
