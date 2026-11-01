@@ -156,7 +156,8 @@ export function stepOnce(run, input, hooks = {}) {
     } else if (!r.bot || !run.simBots) continue;
     const sp = r.sp;
     const wasAir = sp.mode === 'air' || sp.mode === 'swing';
-    const inp = r.me ? input : think(r.brain, sp, level, weather, t, STEP, run.seed, world);
+    // the local player's input, or a function of (racer, time) that steers it every step (the trailer's autopilot)
+    const inp = r.me ? (typeof input === 'function' ? input(r, t) : input) : think(r.brain, sp, level, weather, t, STEP, run.seed, world);
     step(sp, level, world, inp, t, STEP);
     const hit = applyHazards(sp, level, weather, t, run.seed, r.memo);
     if (hit && hooks.onHazard) hooks.onHazard(r, hit);

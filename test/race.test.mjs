@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { rankRace, pointsFor, cupOrder, botSkills, startXs, applyHazards } from '../src/sim/race.js';
-import { createRun, stepOnce, syncAll } from '../src/sim/run.js';
+import { createRun, stepOnce, syncAll, advance } from '../src/sim/run.js';
+import { createBrain, think } from '../src/sim/bot.js';
+import { STEP } from '../src/sim/config.js';
 import { POINTS } from '../src/sim/config.js';
 import { packGhost, unpackGhost, createRecorder, record, ghostAt } from '../src/sim/ghost.js';
 import { knock, snagFor } from '../src/sim/spider.js';
@@ -136,4 +138,20 @@ test('ghosts pack small and play back where the run went', () => {
   assert.ok(Math.abs(at.y - 1200) < 30);
   assert.equal(unpackGhost({ v: 1, d: 'x,1' }), null);
   assert.equal(unpackGhost(null), null);
+});
+
+test('a steering function drives the player every step, as sharp as the sharpest bot (the trailer autopilot)', () => {
+  const seats = [
+    { id: 'me', name: 'Me', me: true, index: 0 },
+    { id: 'bot:0', name: 'Mabel', bot: true, skill: 0.95, index: 1 },
+  ];
+  const run = createRun({ kind: 'race', spout: 1, seed: 7, seats });
+  const brain = createBrain('Juniper', 0.97, 'auto:test');
+  const steer = (r, t) => think(brain, r.sp, run.level, run.weather, t, STEP, run.seed, run.world);
+  // a page at 30 frames a second: four steps per call
+  while (!run.me.finish && run.t < 120) advance(run, run.t + 1 / 30, steer);
+  assert.ok(run.me.finish, 'the autopilot reaches the sun');
+  const bot = run.racers[1];
+  while (!bot.finish && run.t < 160) advance(run, run.t + 1 / 30, null);
+  assert.ok(run.me.finish < (bot.finish ?? 999) * 1.35, `autopilot ${run.me.finish.toFixed(1)} s vs bot ${bot.finish?.toFixed(1)} s`);
 });

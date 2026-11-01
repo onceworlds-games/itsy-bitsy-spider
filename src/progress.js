@@ -27,6 +27,12 @@ export const COLORS = [
   { id: 'storm', hex: '#6E7F99', name: 'Storm', level: 26 },
   { id: 'peach', hex: '#FFB38A', name: 'Peach', level: 29 },
   { id: 'jade', hex: '#2E8B57', name: 'Jade', level: 31 },
+  { id: 'lilac', hex: '#C8A2FF', name: 'Lilac', level: 32 },
+  { id: 'rust', hex: '#B5512A', name: 'Rust', level: 35 },
+  { id: 'flamingo', hex: '#FF5DA2', name: 'Flamingo', level: 37 },
+  { id: 'midnight', hex: '#2A3A7A', name: 'Midnight', level: 39 },
+  { id: 'lime', hex: '#C6F04D', name: 'Lime', level: 43 },
+  { id: 'copper', hex: '#C77B4A', name: 'Copper', level: 47 },
 ];
 export const MARKS = [
   { id: 'ring', name: 'Ring', level: 1 },
@@ -38,6 +44,9 @@ export const MARKS = [
   { id: 'band', name: 'Band', level: 11 },
   { id: 'spots', name: 'Spots', level: 13 },
   { id: 'web', name: 'Web', level: 24 },
+  { id: 'zigzag', name: 'Zigzag', level: 33 },
+  { id: 'eyes', name: 'Eyespots', level: 41 },
+  { id: 'flame', name: 'Flame', level: 45 },
 ];
 export const SPECIES_LIST = [
   { id: 'jumper', name: 'Jumper', level: 1 },
@@ -58,6 +67,11 @@ export const HAT_LIST = [
   { id: 'tophat', name: 'Top Hat', level: 25 },
   { id: 'crown', name: 'Crown', feat: 'cup', note: 'Win a cup' },
   { id: 'halo', name: 'Halo', feat: 'stars', note: 'Every star' },
+  { id: 'bowler', name: 'Bowler', level: 36 },
+  { id: 'chef', name: 'Chef', level: 40 },
+  { id: 'wizard', name: 'Wizard', level: 44 },
+  { id: 'viking', name: 'Viking', level: 49 },
+  { id: 'cloud', name: 'Raincloud', level: 50 },
 ];
 export const TRAILS = [
   { id: 'none', name: 'No trail', level: 1 },
@@ -66,6 +80,9 @@ export const TRAILS = [
   { id: 'leaves', name: 'Leaves', level: 18 },
   { id: 'rainbow', name: 'Rainbow', level: 28 },
   { id: 'gold', name: 'Golden', feat: 'golds', note: 'Every golden fly' },
+  { id: 'embers', name: 'Embers', level: 38 },
+  { id: 'frost', name: 'Frost', level: 42 },
+  { id: 'neon', name: 'Neon', level: 48 },
 ];
 export const DANCES = [
   { id: 'wave', name: 'Wave', level: 1 },
@@ -73,6 +90,8 @@ export const DANCES = [
   { id: 'spin', name: 'Spin', level: 11 },
   { id: 'drum', name: 'Drum', level: 18 },
   { id: 'flip', name: 'Flip', level: 30 },
+  { id: 'ripple', name: 'Ripple', level: 34 },
+  { id: 'shimmy', name: 'Shimmy', level: 46 },
 ];
 export const SLOTS = [
   { id: 'species', name: 'Spider', items: SPECIES_LIST },
@@ -104,6 +123,17 @@ export function unlocksAt(level) {
   const out = [];
   for (const slot of SLOTS) for (const item of slot.items) if (item.level === level) out.push({ slot: slot.id, item });
   return out;
+}
+
+const NOUN = { species: 'spider', color: 'colour', mark: 'pattern', hat: 'hat', trail: 'trail', dance: 'dance' };
+/** What an unlock is called on its own: "Bowler hat", "Lilac colour". */
+export const unlockName = (u) => (/\b(hat|spider)$/i.test(u.item.name) ? u.item.name : `${u.item.name} ${NOUN[u.slot]}`);
+
+const RANK = ['species', 'hat', 'dance', 'trail', 'mark', 'color'];
+/** The best thing the next level unlocks (a new spider or hat before a colour), or null at the top. */
+export function nextUnlock(level) {
+  if (level >= MAX_LEVEL) return null;
+  return unlocksAt(level + 1).sort((a, b) => RANK.indexOf(a.slot) - RANK.indexOf(b.slot))[0] ?? null;
 }
 
 /** The feats behind the special items, read from a save. */

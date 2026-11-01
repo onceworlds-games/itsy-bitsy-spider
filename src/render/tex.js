@@ -14,13 +14,21 @@ export function setAnisotropy(n) {
 
 const base = () => new URL('tex/', document.baseURI).href;
 
-// Clones made before their image arrives wait (version 0 draws nothing yet) and are marked for upload when it does.
+// Clones made before their image arrives wait (version 0 draws nothing yet) and are marked for upload when it does. A set
+// counts its three images in; materials made before then go without maps (their flat tint, not black) until all three
+// are in.
 const waiting = new Map();
-function load(name, srgb) {
-  const t = loader.load(base() + name, () => {
-    for (const c of waiting.get(t) ?? []) c.needsUpdate = true;
-    waiting.delete(t);
-  });
+function load(name, srgb, done) {
+  const t = loader.load(
+    base() + name,
+    () => {
+      for (const c of waiting.get(t) ?? []) c.needsUpdate = true;
+      waiting.delete(t);
+      done(true);
+    },
+    undefined,
+    () => done(false),
+  );
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = maxAniso;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
@@ -32,7 +40,14 @@ function load(name, srgb) {
 export function texSet(id) {
   let s = sets.get(id);
   if (!s) {
-    s = { map: load(`${id}_c.webp`, true), normalMap: load(`${id}_n.webp`, false), orm: load(`${id}_orm.webp`, false) };
+    const set = { pending: 3, failed: false, then: [] };
+    const done = (ok) => {
+      if (!ok) set.failed = true;
+      if (--set.pending > 0) return;
+      for (const f of set.then.splice(0)) if (!set.failed) f();
+    };
+    Object.assign(set, { map: load(`${id}_c.webp`, true, done), normalMap: load(`${id}_n.webp`, false, done), orm: load(`${id}_orm.webp`, false, done) });
+    s = set;
     sets.set(id, s);
   }
   return s;
@@ -76,6 +91,14 @@ export function pbr(id, o = {}) {
     envMapIntensity: o.env ?? 1,
     side: o.side ?? THREE.FrontSide,
   });
+  if (s.pending > 0 || s.failed) {
+    const maps = { map: m.map, normalMap: m.normalMap, roughnessMap: m.roughnessMap, metalnessMap: m.metalnessMap, aoMap: m.aoMap };
+    m.map = m.normalMap = m.roughnessMap = m.metalnessMap = m.aoMap = null;
+    s.then.push(() => {
+      Object.assign(m, maps);
+      m.needsUpdate = true;
+    });
+  }
   if (o.physical && o.clearcoat) {
     m.clearcoat = o.clearcoat;
     m.clearcoatRoughness = o.clearcoatRough ?? 0.15;

@@ -153,10 +153,13 @@ spider is never corrected by the network.
 - **Silk and spider level.** Every climb pays silk on the results card, line by line: reaching the sun (30 + 4 per spout
   number), race place (40/25/15/10/8/6), new stars (10 each), flies (2), the golden fly (25), perfect grips (3), swings
   (1, up to 15), best combo (2 per step from ×3, up to 40), Monsoon metres (0.2 per metre). Levels 1-50, level n costs
-  80 + 30(n-1) silk. Every level up to 31 unlocks something, shown with a stamp and a sound.
-- **Wardrobe** (earned, never bought): 5 species (Jumper, Peacock 5, Orb Weaver 10, Tarantula 16, Longlegs 22), 19
-  colours, 9 patterns, 9 hats plus the Crown (win a cup) and the Halo (every star), 5 silk trails plus Golden (every golden
-  fly), 5 win dances (Wave, Hop 6, Spin 11, Drum 18, Flip 30). Others see your look in races.
+  80 + 30(n-1) silk. Every level unlocks something, shown with a stamp and a sound; the last, at 50, is **your own
+  little raincloud** drizzling on your head.
+- **Wardrobe** (earned, never bought): 5 species (Jumper, Peacock 5, Orb Weaver 10, Tarantula 16, Longlegs 22), 25
+  colours, 12 patterns (up to Zigzag 33, Eyespots 41, Flame 45), 13 hats (Beanie 2 … Top Hat 25, Bowler 36, Chef 40,
+  Wizard 44, Viking 49, Raincloud 50) plus the Crown (win a cup) and the Halo (every star), 7 silk trails (Sparkle 8 …
+  Neon 48) plus Golden (every golden fly), 7 win dances (Wave, Hop 6, Spin 11, Drum 18, Flip 30, Ripple 34, Shimmy 46).
+  Others see your look in races.
 - **Per spout:** three stars, every fly, the golden fly, a ghost, a board (`spout-1`…`spout-12`, seconds, lower is better).
 - **Every day:** three goals, the same for everyone (perfect grips, flies, swings, climbs, flushes held, bone-dry climbs,
   races, Monsoon metres, the golden fly, a combo), 60 silk each, and a **chest** when all three are done (150 silk, +10% per

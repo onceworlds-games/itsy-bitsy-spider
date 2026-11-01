@@ -14,7 +14,7 @@ import { featuresIn, inPocket } from './sim/level.js';
 import { snagFor, modeName } from './sim/spider.js';
 import { hashString } from './sim/rng.js';
 import { rankRace, pointsFor } from './sim/race.js';
-import { JOIN, INTRO, createNet, cupRules, roundInfo, stubOw, stubRoom, createLocalMatch } from './net.js';
+import { JOIN, INTRO, createNet, cupRules, roundInfo, stubOw, stubRoom, createLocalMatch, readLook } from './net.js';
 import { createUI, setInsets, tag, h, stars } from './ui.js';
 import { drawHud, hudLayout } from './hud.js';
 import { fmtTime, ORD, clamp } from './paint2d.js';
@@ -85,6 +85,20 @@ const TRAIL_RGB = {
     [1.3, 0.9, 0.25],
   ],
   gold: [[3, 2.1, 0.5]],
+  embers: [
+    [3.2, 1.1, 0.25],
+    [2.6, 0.5, 0.12],
+    [3, 2, 0.6],
+  ],
+  frost: [
+    [1.7, 2.3, 3],
+    [2.6, 2.8, 3],
+  ],
+  neon: [
+    [3, 0.4, 2.2],
+    [0.3, 2.6, 3],
+    [2.4, 3, 0.4],
+  ],
 };
 
 async function boot() {
@@ -281,13 +295,14 @@ async function boot() {
 
   // The trailer's autopilot: the local spider is driven by the sharpest bot brain.
   let autoBrain = null;
-  function autoInput(r) {
-    const key = `${r.id}:${curRun?.seed}:${curRun?.def.id}`;
+  function autoInput(r, run = curRun) {
+    const key = `${r.id}:${run?.seed}:${run?.def.id}`;
     if (!autoBrain || autoBrain.key !== key) {
       autoBrain = createBrain('Juniper', 0.97, `auto:${key}`);
       autoBrain.key = key;
     }
-    return { ...think(autoBrain, r.sp, curRun.level, curRun.weather, curRun.t, 1 / 60, curRun.seed, curRun.world) };
+    // steered every fixed step, exactly as the bots are
+    return (me, t) => think(autoBrain, me.sp, run.level, run.weather, t, STEP, run.seed, run.world);
   }
 
   // ------------------------------------------------------------ flows
@@ -528,11 +543,12 @@ async function boot() {
   /** The level badge with its silk bar, and the streak. */
   function profileFace(lv) {
     const pct = lv.max ? 100 : Math.round((lv.into / lv.need) * 100);
+    const nextU = P.nextUnlock(lv.level);
     return h(
       'span',
       { class: 'prof' },
       h('span', { class: 'lvl', text: String(lv.level) }),
-      h('span', { class: 'stack left' }, h('span', { class: 'pname', text: 'Wardrobe' }), h('span', { class: 'bar' }, h('i', { style: `width:${pct}%` })), h('span', { class: 'sub', text: lv.max ? 'Top level' : `${lv.into}/${lv.need} silk` })),
+      h('span', { class: 'stack left' }, h('span', { class: 'pname', text: 'Wardrobe' }), h('span', { class: 'bar' }, h('i', { style: `width:${pct}%` })), h('span', { class: 'sub', text: lv.max ? 'Top level' : `${lv.into}/${lv.need} silk` }), nextU ? h('span', { class: 'sub next', text: `Next: ${P.unlockName(nextU)}` }) : null),
       save.streak.n > 0 ? h('span', { class: 'streak', title: 'Day streak', text: String(save.streak.n) }) : null,
     );
   }
@@ -1398,7 +1414,8 @@ async function boot() {
           else fx.trail(st.x + jx, st.y + jy, 4, TRAIL_RGB.sparkle[0], 1.8);
         } else {
           const set = TRAIL_RGB[tr] ?? TRAIL_RGB.sparkle;
-          fx.trail(st.x + jx, st.y + jy, 4, set[Math.floor(Math.random() * set.length)], tr === 'bubbles' ? 3.6 : tr === 'leaves' ? 3 : 2.6);
+          fx.trail(st.x + jx, st.y + jy, 4, set[Math.floor(Math.random() * set.length)], tr === 'bubbles' ? 3.6 : tr === 'leaves' ? 3 : tr === 'embers' ? 2 : tr === 'frost' ? 2.2 : 2.6);
+          if (tr === 'frost' && Math.random() < 0.25) fx.glint(st.x + jx * 2, st.y + jy * 2, 6, 4, set[1]);
         }
       }
     }
@@ -1847,7 +1864,7 @@ async function boot() {
     if (net && match && inRacePhase()) {
       const r = net.round?.run;
       const me = r?.me;
-      const mine = me && me.sp && flow === 'race' && !paused ? (AUTOPLAY ? autoInput(me) : input.read()) : null;
+      const mine = me && me.sp && flow === 'race' && !paused ? (AUTOPLAY ? autoInput(me, r) : input.read()) : null;
       net.update(mine, real);
       if (flow === 'race' && net.round && curRun !== net.round.run) useRun(net.round.run);
       if (flow === 'race' && me && curRun === net.round?.run) myEvents(me);
@@ -2263,7 +2280,7 @@ async function boot() {
       toLobby();
       if (name === 'spouts') showSpouts();
       if (name === 'wardrobe') {
-        wardrobeSlot = 'hat';
+        wardrobeSlot = P.SLOTS.some((x) => x.id === params.get('slot')) ? params.get('slot') : 'hat';
         showWardrobe();
       }
     } else if (name === 'solo') {
@@ -2302,7 +2319,7 @@ async function boot() {
       const run = createRun({ kind: 'race', spout: cup.spouts[2], seed: 31, seats: seats.map((x) => ({ ...x, bot: !x.me, skill: [0.5, 0.7, 0.35, 0.6, 0.8, 0.45][x.index] })) });
       for (const r of run.racers) r.name = seats[r.index].name;
       useRun(run);
-      while (run.racers.filter((r) => r.finish).length < 4 && run.t < 120) advance(run, run.t + 1 / 60, autoInput(run.me));
+      while (run.racers.filter((r) => r.finish).length < 4 && run.t < 120) advance(run, run.t + 1 / 60, autoInput(run.me, run));
       for (const r of run.racers) if (r.sp) r.sp.events.length = 0;
       const ids = seats.map((x) => x.id);
       const fin = {};
@@ -2389,8 +2406,10 @@ async function boot() {
     uiRoot.style.display = 'none';
     const seats = BOT_NAMES.slice(0, S.n).map((n, i) => ({ id: `b${i}`, name: n, bot: true, skill: [0.95, 0.8, 0.7, 0.6, 0.85, 0.5][i], index: i }));
     const run = createRun({ kind: 'race', spout: S.spout, seed: S.seed, seats });
+    // ?look=species.colour.pattern.hat.trail.dance dresses the first spider (to look at a wardrobe item)
+    const lookQ = readLook(params.get('look'));
     for (const r of run.racers) {
-      r.look = { ...(LOOKS[S.looks?.[r.id]] ?? botLook(r.name)) };
+      r.look = { ...(r.id === 'b0' && lookQ ? lookQ : LOOKS[S.looks?.[r.id]] ?? botLook(r.name)) };
       r.lookSet = true;
     }
     const t0 = Math.max(0, S.t - (S.live ?? 0.8));

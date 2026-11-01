@@ -838,6 +838,10 @@ button.tag[disabled] .face {
 .prof .sub {
   font-size: 14px;
 }
+.prof .sub.next {
+  font-size: 13px;
+  color: #6b4a12;
+}
 .streak {
   display: inline-grid;
   place-items: center;
@@ -1240,6 +1244,9 @@ button.tag[disabled] .face {
   flex-direction: column;
   align-items: center;
   gap: 0;
+}
+:where(.narrow) .lobby .botrow > * {
+  --silk: 12px !important; /* hang high, clear of the names over the spiders */
 }
 :where(.narrow) .lobby .solorow {
   grid-row: 6;

@@ -23,14 +23,16 @@ import {
   weekOf,
   weekGoalFor,
   WEEK_KINDS,
+  nextUnlock,
+  unlockName,
 } from '../src/progress.js';
 
-test('levels: each costs more than the last, and every level up to 31 unlocks something', () => {
+test('levels: each costs more than the last, and every level unlocks something', () => {
   assert.equal(levelOf(0).level, 1);
   assert.equal(levelOf(levelCost(1) - 1).level, 1);
   assert.equal(levelOf(levelCost(1)).level, 2);
   for (let n = 2; n < MAX_LEVEL; n++) assert.ok(levelCost(n) > levelCost(n - 1));
-  for (let l = 2; l <= 31; l++) assert.ok(unlocksAt(l).length >= 1, `level ${l} unlocks nothing`);
+  for (let l = 2; l <= MAX_LEVEL; l++) assert.ok(unlocksAt(l).length >= 1, `level ${l} unlocks nothing`);
   const top = levelOf(1e9);
   assert.equal(top.level, MAX_LEVEL);
   assert.ok(top.max);
@@ -186,4 +188,16 @@ test('the goal of the week: Monday to Sunday, the same for everyone, paid once',
   rollDay(s, '2026-11-09');
   assert.equal(s.week.key, '2026-11-09');
   assert.equal(s.week.goal.done, false);
+});
+
+test('the lobby names what the next level brings', () => {
+  assert.equal(nextUnlock(MAX_LEVEL), null);
+  for (let l = 1; l < MAX_LEVEL; l++) {
+    const u = nextUnlock(l);
+    assert.ok(u, `nothing after level ${l}`);
+    const name = unlockName(u);
+    assert.ok(name.length > 2 && name.length <= 22, name);
+  }
+  assert.equal(unlockName({ slot: 'hat', item: { name: 'Party Hat' } }), 'Party Hat');
+  assert.equal(unlockName({ slot: 'color', item: { name: 'Lilac' } }), 'Lilac colour');
 });

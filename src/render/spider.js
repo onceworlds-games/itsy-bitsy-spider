@@ -71,18 +71,19 @@ const legGeo = (() => {
   lathe.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const parts = [lathe.toNonIndexed()];
   // spines
-  for (let k = 0; k < 7; k++) {
-    const y = 0.18 + (k / 7) * 0.6;
+  // (the segment is scaled far more along its length than across, so a spine is short and stands nearly upright here)
+  for (let k = 0; k < 5; k++) {
+    const y = 0.2 + (k / 5) * 0.6;
     const a = k * 2.39996;
-    const cone = new THREE.ConeGeometry(0.085, 0.8, 4, 1);
-    cone.translate(0, 0.4, 0);
-    cone.rotateZ(-1.05); // out, raked forward along the leg
+    const cone = new THREE.ConeGeometry(0.08, 0.5, 4, 1);
+    cone.translate(0, 0.25, 0);
+    cone.rotateZ(-1.32); // out, raked a little toward the tip
     cone.rotateY(a);
     cone.translate(Math.cos(a) * R(y) * 0.85, y, -Math.sin(a) * R(y) * 0.85);
     const c = cone.toNonIndexed();
     c.deleteAttribute('uv');
     c.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(c.attributes.position.count * 2), 2));
-    c.setAttribute('color', new THREE.BufferAttribute(new Float32Array(c.attributes.position.count * 3).fill(0.45), 3));
+    c.setAttribute('color', new THREE.BufferAttribute(new Float32Array(c.attributes.position.count * 3).fill(0.55), 3));
     parts.push(c);
   }
   return mergeGeometries(parts);
@@ -164,6 +165,50 @@ function patternTex(look) {
         ctx.arc(((k * 53) % w) + 4, ((k * 37) % h) + 4, 4 + (k % 3) * 2, 0, Math.PI * 2);
         ctx.fill();
       }
+    } else if (mark === 'zigzag') {
+      // two zigzags along the back
+      ctx.lineWidth = h * 0.05;
+      ctx.lineJoin = 'miter';
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        for (let k = 0; k <= 8; k++) ctx.lineTo(topU + s * w * (0.05 + (k % 2) * 0.07), h * (0.12 + k * 0.095));
+        ctx.stroke();
+      }
+    } else if (mark === 'eyes') {
+      // a pair of eyespots, like a moth's: a pale ring, a dark pupil, a catchlight
+      for (const s of [-1, 1]) {
+        const cx = topU + s * w * 0.085;
+        const cy = h * 0.42;
+        ctx.fillStyle = `#${light.getHexString()}`;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, w * 0.06, h * 0.17, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#14161c';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, w * 0.035, h * 0.1, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(cx - w * 0.012, cy - h * 0.035, w * 0.01, h * 0.025, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (mark === 'flame') {
+      // flames licking back from the front: red-orange, gold, then a pale core
+      const lick = (col, sc) => {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(topU - w * 0.2 * sc, h);
+        for (let k = 0; k <= 6; k++) {
+          const x = topU + (k / 6 - 0.5) * w * 0.4 * sc;
+          const tip = h * (1 - (0.45 + 0.35 * Math.abs(Math.sin(k * 1.9))) * sc);
+          ctx.quadraticCurveTo(x - w * 0.02, (h + tip) / 2, x, tip);
+        }
+        ctx.lineTo(topU + w * 0.2 * sc, h);
+        ctx.fill();
+      };
+      lick('#d8401f', 1);
+      lick('#ffb648', 0.72);
+      lick('#fff1b0', 0.4);
     }
     // fuzz speckle
     for (let k = 0; k < 1400; k++) {
@@ -685,6 +730,13 @@ export function createSpider(look, opts = {}) {
         }
       } else if (danceKind === 'drum') {
         lift = Math.abs(Math.sin(d * 11)) * 1.2;
+      } else if (danceKind === 'shimmy') {
+        // a side-to-side sway with a little bounce on every beat
+        tmp.q.setFromAxisAngle(tmp.e.set(0, 1, 0), Math.sin(d * 8) * 0.55);
+        qRoot.multiply(tmp.q);
+        lift = Math.abs(Math.sin(d * 16)) * 1.6;
+      } else if (danceKind === 'ripple') {
+        lift = 1 + Math.sin(d * 5) * 0.8;
       }
     }
     root.quaternion.copy(qRoot);
@@ -700,9 +752,9 @@ export function createSpider(look, opts = {}) {
     const st2 = 1 + A.squash;
     body.scale.set(st2, 1 / Math.sqrt(Math.max(0.3, st2)), 1 / Math.sqrt(Math.max(0.3, st2)));
     body.rotation.set(0, 0, mode === 'air' ? 0.15 : 0);
-    const waving = mode === 'done' && (danceKind === 'wave' || danceKind === 'drum');
+    const waving = mode === 'done' && (danceKind === 'wave' || danceKind === 'drum' || danceKind === 'shimmy');
     abd.rotation.set(0, 0, 0.16 + A.abdA - A.crouch * 0.12 + (waving ? 0.45 + Math.sin(A.dance * 9) * 0.12 : mode === 'done' ? 0.2 : 0));
-    abd.rotation.x = waving ? Math.sin(A.dance * (danceKind === 'drum' ? 11 : 6)) * 0.35 : 0;
+    abd.rotation.x = waving ? Math.sin(A.dance * (danceKind === 'drum' ? 11 : danceKind === 'shimmy' ? 8 : 6)) * 0.35 : 0;
     if (fan) {
       const open = mode === 'done' ? 1 : 0;
       const fs = 0.2 + open * 0.8;
@@ -718,6 +770,14 @@ export function createSpider(look, opts = {}) {
     const yaw = Math.atan2(-tmp.d.z, tmp.d.x);
     ceph.rotation.set(0, A.look * Math.max(-1.1, Math.min(1.1, yaw)) * 0.7, A.look * 0.15);
     if (hat?.userData.spin) hat.userData.spin.rotation.y += dt * (12 + Math.hypot(A.vx, A.vy) * 0.1);
+    if (hat?.userData.drops) {
+      hat.userData.cloud.position.y = 10 + Math.sin(A.t * 2.2) * 0.5;
+      for (const d of hat.userData.drops) {
+        const u = ((A.t * 1.6 + d.userData.o) % 2.2) / 2.2;
+        d.position.y = 8 - u * 8;
+        d.visible = u < 0.92;
+      }
+    }
     // palps wave
     for (let k = 0; k < 2; k++) palps[k].rotation.z = Math.sin(A.t * (A.idle > 0 ? 5 : 9) + k * 1.7) * 0.35 + 0.2;
 
@@ -756,6 +816,13 @@ export function createSpider(look, opts = {}) {
             if (L.i === 0) lift = 6;
           } else if (danceKind === 'flip') {
             if (L.i < 2) lift = 3 + Math.sin(A.dance * 9 + L.side) * 2;
+          } else if (danceKind === 'ripple') {
+            // a wave running down the legs from front to back, one side then the other
+            const w = Math.sin(A.dance * 7 - L.i * 0.9 - (L.side > 0 ? 0 : Math.PI / 2));
+            lift = Math.max(0, w) * 9;
+            fxo += Math.max(0, w) * 2;
+          } else if (danceKind === 'shimmy') {
+            if (L.i === 0) lift = 7 + Math.sin(A.dance * 16 + L.side) * 2;
           }
         } else if (A.speed > 4) {
           if (u < 0.5) fxo += STRIDE * (0.5 - u * 2);
@@ -966,6 +1033,123 @@ function makeHat(kind, look) {
       r.rotation.x = Math.PI / 2;
       r.position.y = 4.5;
       g.add(r);
+      break;
+    }
+    case 'bowler': {
+      const felt = mat(0x2b2521, { roughness: 0.85 });
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(4, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), felt);
+      dome.scale.y = 1.2;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(5.9, 5.9, 0.45, 24), felt);
+      const curl = new THREE.Mesh(new THREE.TorusGeometry(5.8, 0.45, 6, 28), felt);
+      curl.rotation.x = Math.PI / 2;
+      curl.position.y = 0.3;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(4.05, 4.05, 1.1, 24), mat(0x141110, { roughness: 0.5 }));
+      band.position.y = 0.75;
+      g.add(dome, brim, curl, band);
+      g.rotation.z = -0.12;
+      break;
+    }
+    case 'chef': {
+      const white = mat(0xf6f3ec, { roughness: 0.9 });
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(3.9, 3.7, 3.4, 20), white);
+      band.position.y = 1.7;
+      g.add(band);
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2;
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(2.3, 12, 8), white);
+        puff.position.set(Math.cos(a) * 2.6, 4.6, Math.sin(a) * 2.6);
+        g.add(puff);
+      }
+      const top = new THREE.Mesh(new THREE.SphereGeometry(2.9, 14, 10), white);
+      top.position.y = 5.6;
+      g.add(top);
+      g.rotation.z = -0.1;
+      break;
+    }
+    case 'wizard': {
+      const tex = canvasTex('wizardHat', 128, 128, (ctx, w, h) => {
+        ctx.fillStyle = '#26318c';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#ffd34a';
+        const star = (x, y, r) => {
+          ctx.beginPath();
+          for (let k = 0; k < 10; k++) {
+            const a = (k / 10) * Math.PI * 2;
+            const rr = k % 2 ? r * 0.42 : r;
+            ctx.lineTo(x + Math.sin(a) * rr, y - Math.cos(a) * rr);
+          }
+          ctx.fill();
+        };
+        for (let k = 0; k < 9; k++) star((k * 47) % w, 10 + ((k * 29) % (h - 20)), 5 + (k % 3) * 2);
+      });
+      const cloth = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75 });
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.4, 0.4, 24), cloth);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(3.9, 9, 20), cloth);
+      cone.position.y = 4.5;
+      // the tip flops over
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(1.3, 4, 12), cloth);
+      tip.position.set(-1.2, 9.6, 0);
+      tip.rotation.z = 0.9;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(3.75, 3.85, 0.9, 20), mat(0xffd34a, { metalness: 0.6, roughness: 0.35 }));
+      band.position.y = 0.7;
+      g.add(brim, cone, tip, band);
+      g.rotation.z = -0.15;
+      break;
+    }
+    case 'viking': {
+      const steel = mat(0xa3acb4, { metalness: 0.9, roughness: 0.35 });
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(4.5, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), steel);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(4.5, 0.55, 6, 28), mat(0x6b4a2a, { roughness: 0.8 }));
+      rim.rotation.x = Math.PI / 2;
+      const crest = new THREE.Mesh(new THREE.TorusGeometry(4.45, 0.4, 6, 20, Math.PI), steel);
+      crest.rotation.y = Math.PI / 2;
+      g.add(dome, rim, crest);
+      // horns: tapering segments curving out and up from each side
+      const horn = mat(0xf1e6cf, { roughness: 0.5 });
+      for (const s of [-1, 1]) {
+        let x = 0;
+        let y = 1.6;
+        let a = 0;
+        for (let k = 0; k < 6; k++) {
+          const r0 = 1.7 * (1 - k / 6) + 0.15;
+          const r1 = 1.7 * (1 - (k + 1) / 6) + 0.15;
+          const seg = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, 2.1, 8), horn);
+          const dx = Math.cos(a) * 2;
+          const dy = Math.sin(a) * 2;
+          seg.position.set(0, y + dy / 2, s * (4 + x + dx / 2));
+          seg.rotation.x = s * (Math.PI / 2 - a);
+          g.add(seg);
+          x += dx;
+          y += dy;
+          a += 0.36;
+        }
+      }
+      break;
+    }
+    case 'cloud': {
+      // a little raincloud of your own, drizzling on your head
+      const puff = new THREE.MeshStandardMaterial({ color: 0xe8edf3, roughness: 0.95, emissive: 0x5a6878, emissiveIntensity: 0.25 });
+      const cloud = new THREE.Group();
+      for (const [x, y, z, r] of [[0, 0, 0, 3.2], [2.8, -0.4, 0.6, 2.4], [-2.9, -0.5, -0.4, 2.5], [0.8, 1.6, -0.6, 2.2], [-1.2, 0.2, 2.2, 2.1], [1.2, 0, -2.2, 2.1]]) {
+        const p = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 8), puff);
+        p.position.set(x, y, z);
+        cloud.add(p);
+      }
+      cloud.position.y = 10;
+      const dropMat = new THREE.MeshStandardMaterial({ color: 0x9fdcf5, roughness: 0.1, emissive: 0x2a6f8f, emissiveIntensity: 0.6 });
+      const drops = [];
+      for (let k = 0; k < 4; k++) {
+        const d = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 6), dropMat);
+        d.scale.y = 1.8;
+        d.position.set((k - 1.5) * 1.6, 8, (k % 2 ? 1 : -1) * 0.8);
+        d.userData.o = k * 2.1;
+        d.castShadow = false;
+        drops.push(d);
+        g.add(d);
+      }
+      g.add(cloud);
+      g.userData.cloud = cloud;
+      g.userData.drops = drops;
       break;
     }
     default:
