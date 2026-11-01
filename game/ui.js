@@ -101,9 +101,7 @@ export function setInsets(root, W, H, reserved) {
 export function stars(n, size = 20, animate = false) {
   const wrap = h('span', { class: 'stars', 'aria-label': `${n} of 3 stars` });
   for (let i = 0; i < 3; i++) {
-    const s = h('span', { class: `star ${i < n ? 'on' : ''} ${animate && i < n ? 'pop' : ''}`, style: `--d:${300 + i * 260}ms;font-size:${size}px` });
-    s.textContent = '★';
-    wrap.append(s);
+    wrap.append(h('span', { class: `star ${i < n ? 'on' : ''} ${animate && i < n ? 'pop' : ''}`, style: `--d:${300 + i * 260}ms;font-size:${size}px` }));
   }
   return wrap;
 }

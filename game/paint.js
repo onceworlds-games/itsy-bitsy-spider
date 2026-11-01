@@ -116,11 +116,12 @@ export const easeOutBack = (k) => {
 /** Seconds as 0:23.4 (or 23.4 under a minute when short). */
 export function fmtTime(s, short = false) {
   if (!Number.isFinite(s)) return '–';
-  const m = Math.floor(s / 60);
-  const r = s - m * 60;
-  const tenths = r.toFixed(1).padStart(4, '0');
-  if (short && m === 0) return r.toFixed(1);
-  return `${m}:${tenths}`;
+  // Tenths cut, not rounded: a best kept to hundredths shows as the clock showed it, and 59.96 never reads 0:60.0.
+  const d = Math.floor(s * 10 + 1e-6);
+  const m = Math.floor(d / 600);
+  const r = ((d - m * 600) / 10).toFixed(1);
+  if (short && m === 0) return r;
+  return `${m}:${r.padStart(4, '0')}`;
 }
 
 export const ORD = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'TH' : ['TH', 'ST', 'ND', 'RD'][n % 10] ?? 'TH'}`;

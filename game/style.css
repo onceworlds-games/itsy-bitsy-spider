@@ -269,11 +269,11 @@ button.tag[disabled] .face {
   -webkit-text-stroke: 0.16em var(--ink);
 }
 .sign .l1 {
-  font-size: clamp(30px, 8vw, 50px);
+  font-size: clamp(30px, calc(var(--vw, 1vw) * 8), 50px);
   color: var(--bone);
 }
 .sign .l2 {
-  font-size: clamp(54px, 16vw, 96px);
+  font-size: clamp(54px, calc(var(--vw, 1vw) * 16), 96px);
   color: var(--gold);
   letter-spacing: 0.02em;
 }
@@ -367,6 +367,10 @@ button.tag[disabled] .face {
 .timecard .big {
   font-size: 44px;
 }
+/* A finish hangs at the top: your spider, and the ghost you raced, stay in view below it. */
+.finish .card {
+  margin: 0 0 auto;
+}
 
 .spoutname {
   pointer-events: none;
@@ -400,7 +404,7 @@ button.tag[disabled] .face {
 }
 .row {
   display: grid;
-  grid-template-columns: 44px 22px minmax(90px, 160px) 40px;
+  grid-template-columns: 44px 22px minmax(90px, 160px) minmax(40px, auto);
   align-items: center;
   gap: 8px;
 }
@@ -467,16 +471,63 @@ button.tag[disabled] .face {
 .podium .nm {
   font-size: 18px;
 }
-.myline {
-  margin-top: 10px;
+.cuptable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.tablecol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.cuptable .places {
+  margin: 0;
+}
+.cuptable .places:empty {
+  display: none;
+}
+.cuptable .places .tag::before {
+  display: block;
+}
+.cuptable .places .tag {
+  margin-top: var(--silk);
+}
+/* A race's places hang from the top: the spiders at the top of the spout stay in view below them. */
+.roundend .places {
+  margin: 16px 0 0;
+}
+/* What comes next, and in how many seconds. */
+.nextline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
   font-size: 20px;
   color: var(--bone);
   text-shadow:
     0 2px 0 var(--ink),
     0 0 6px var(--ink);
 }
-.results .continue {
-  margin-top: auto;
+.secs {
+  display: inline-block;
+  min-width: 30px;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border-radius: 15px;
+  background: var(--ink);
+  color: var(--gold);
+  font: 400 17px/30px var(--display);
+  text-align: center;
+  text-shadow: none;
+}
+.withsecs {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .stars {
@@ -484,13 +535,30 @@ button.tag[disabled] .face {
   gap: 2px;
 }
 .star {
-  color: rgba(14, 20, 27, 0.35);
-  line-height: 1;
+  /* A drawn star (no font has the same one on every phone): an ink star, a gold one inside it when earned. */
+  position: relative;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.12em;
 }
-.star.on {
-  color: var(--gold);
-  -webkit-text-stroke: 1.5px var(--ink);
-  paint-order: stroke fill;
+.star::before,
+.star::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 2%, 62% 36%, 98% 37%, 69% 59%, 80% 95%, 50% 74%, 20% 95%, 31% 59%, 2% 37%, 38% 36%);
+}
+.star::before {
+  background: rgba(14, 20, 27, 0.35);
+}
+.star.on::before {
+  background: var(--ink);
+}
+.star.on::after {
+  background: var(--gold);
+  transform: scale(0.7);
+  transform-origin: 50% 56%;
 }
 .star.pop {
   animation: pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.6) both;
@@ -505,27 +573,81 @@ button.tag[disabled] .face {
   }
 }
 
-/* Short screens (landscape phones): tighter threads, smaller faces. */
-@media (max-height: 460px) {
-  .tag {
-    margin-top: calc(var(--silk, 26px) * 0.5);
-  }
-  .tag::before {
-    top: calc(-0.5 * var(--silk, 26px));
-    height: calc(0.5 * var(--silk, 26px));
-  }
-  .sign {
-    padding: 8px 26px 12px;
-  }
-  .sign .l1 {
-    font-size: 28px;
-  }
-  .sign .l2 {
-    font-size: 52px;
-  }
-  .timecard .big {
-    font-size: 34px;
-  }
+/* Short screens (landscape phones): tighter threads, smaller faces. The page sets .short and .wide on #ui from its own
+   size (the viewport in play, a phone-sized box in the debug screens), so these act like media queries. */
+:where(.short) .tag {
+  margin-top: calc(var(--silk, 26px) * 0.5);
+}
+:where(.short) .tag::before {
+  top: calc(-0.5 * var(--silk, 26px));
+  height: calc(0.5 * var(--silk, 26px));
+}
+:where(.short) .sign {
+  padding: 8px 26px 12px;
+}
+:where(.short) .sign .l1 {
+  font-size: 28px;
+}
+:where(.short) .sign .l2 {
+  font-size: 52px;
+}
+:where(.short) .timecard .big {
+  font-size: 34px;
+}
+
+/* The lobby on a landscape phone: the cup across the top, the buttons either side of the spout, the bench clear. */
+:where(.short) .lobby {
+  display: grid;
+  grid-template-columns: 1fr min(250px, 32%) 1fr;
+  grid-template-rows: auto 1fr auto auto;
+  align-items: start;
+  gap: 0 10px;
+}
+:where(.short) .lobby .cuprow {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+:where(.short) .lobby .botrow,
+:where(.short) .lobby .solorow {
+  display: contents;
+}
+:where(.short) .lobby .spouts {
+  grid-area: 3 / 1;
+  justify-self: end;
+}
+:where(.short) .lobby .monsoon {
+  grid-area: 4 / 1;
+  justify-self: end;
+}
+:where(.short) .lobby .bots {
+  grid-area: 3 / 3;
+  justify-self: start;
+}
+:where(.short) .lobby .invite {
+  grid-area: 4 / 3;
+  justify-self: start;
+}
+/* A race's places in two columns, and the cup's podium beside the rest of its table. */
+:where(.short) .roundend .places {
+  margin-top: 0;
+  display: grid;
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  gap: 0 14px;
+}
+:where(.short) .roundend .places .tag:nth-child(4)::before {
+  display: block;
+}
+:where(.short) .roundend .nextline {
+  margin-top: 0;
+}
+:where(.short) .cuptable {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 18px;
+}
+:where(.short) .podium {
+  margin-top: 0;
 }
 
 .reduced .tag,
@@ -562,14 +684,19 @@ button.tag[disabled] .face {
 }
 
 /* Wide screens: the sign hangs to the left of the spout, so the race up it stays in view. */
-@media (min-aspect-ratio: 6/5) {
-  .title {
-    align-items: flex-start;
-  }
-  .title .sign {
-    margin-left: max(0px, calc(25% - 230px));
-  }
-  .title .play {
-    align-self: center;
-  }
+/* (.wide: at least 6:5) */
+:where(.wide) .title {
+  align-items: flex-start;
+}
+:where(.wide) .title .sign {
+  margin-left: max(0px, calc(25% - 230px));
+}
+:where(.wide) .title .play {
+  align-self: center;
+}
+
+.withstar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

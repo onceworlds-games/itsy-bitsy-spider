@@ -212,8 +212,8 @@ export function drawHud(ctx, h) {
       ctx.stroke();
     }
   }
-  // Names over the others, a chevron over you, grip round you.
-  if (h.names) for (const n of h.names) outlined(ctx, n.name, n.sx, n.sy - 32, 16, { fill: n.color ?? BONE });
+  // Names over the others (stepped up where they would overlap), a chevron over you, grip round you.
+  if (h.names) packNames(ctx, h.names, h.me);
   if (h.me) {
     const m = h.me;
     const bob = h.reduced ? 0 : Math.sin(t * 4) * 2;
@@ -381,4 +381,51 @@ function drawCount(ctx, h) {
     }
   }
   ctx.restore();
+}
+
+/**
+ * Names over the spiders: each at its spider unless it would cover a name already placed (or your chevron); then it
+ * steps up a row, with a silk thread down to its spider. A gold check follows a player who is ready.
+ */
+function packNames(ctx, names, me) {
+  ctx.font = `800 16px ${FONT_TEXT}`;
+  const sorted = [...names].sort((a, b) => b.sy - a.sy || a.sx - b.sx);
+  const boxes = me ? [{ x0: me.sx - 11, x1: me.sx + 11, y: me.sy - 38 }] : [];
+  const placed = sorted.map((n) => {
+    const tw = ctx.measureText(n.name).width;
+    const wd = tw + (n.ready ? 17 : 0);
+    const x0 = n.sx - wd / 2;
+    const x1 = n.sx + wd / 2;
+    let y = n.sy - 32;
+    for (let k = 0; k < 8 && boxes.some((b) => x0 < b.x1 + 6 && x1 > b.x0 - 6 && Math.abs(y - b.y) < 19); k++) y -= 21;
+    boxes.push({ x0, x1, y });
+    return { n, tw, x0, y, lifted: y < n.sy - 33 };
+  });
+  ctx.strokeStyle = 'rgba(243,237,226,0.45)';
+  ctx.lineWidth = 1;
+  for (const p of placed) {
+    if (!p.lifted) continue;
+    ctx.beginPath();
+    ctx.moveTo(p.n.sx, p.y + 9);
+    ctx.lineTo(p.n.sx, p.n.sy - 20);
+    ctx.stroke();
+  }
+  for (const p of placed) {
+    outlined(ctx, p.n.name, p.x0 + p.tw / 2, p.y, 16, { fill: p.n.color ?? BONE });
+    if (p.n.ready) {
+      const cx = p.x0 + p.tw + 10;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, p.y);
+      ctx.lineTo(cx - 1, p.y + 4);
+      ctx.lineTo(cx + 6, p.y - 5);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.strokeStyle = GOLD;
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+    }
+  }
 }

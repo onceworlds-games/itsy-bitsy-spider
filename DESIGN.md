@@ -363,6 +363,9 @@ the picture, and the best moment replayed with the spiders' animation and partic
   the pack of six climbing the Barn; neck and neck, then a flush washes the leader down a bend; a surge on the
   Lighthouse and a dive into a dry pocket; the last stretch, rivals bursting into confetti and the sun coming out over
   the roofs; the name sign over the title's attract race.
+- **Debug screens** (never shown to players): `?poster=screen-<lobby|spouts|solo|monsoon|race|results>[.WxH]` stages that
+  screen as real play lays it out, in a box of that size (390x844, 844x390...) with dashed stand-ins for the platform's
+  menu and lobby bar, so phone layouts can be checked from a 16:9 picture.
 
 ## Originality check
 

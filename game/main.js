@@ -15,9 +15,10 @@ import { JOIN, INTRO, createNet, cupRules, roundInfo, stubOw, stubRoom, createLo
 import { rainAt, debrisComing } from './weather.js';
 import { BOT_NAMES, createBrain, think } from './bot.js';
 import { dayKey, daySeed } from './monsoon.js';
-import { packGhost, unpackGhost, ghostAt } from './ghost.js';
+import { packGhost, unpackGhost, ghostAt, GHOST_HZ } from './ghost.js';
 import { fmtTime, ORD, clamp } from './paint.js';
 import { featuresIn, inPocket } from './level.js';
+import { rankRace, pointsFor } from './race.js';
 
 const params = new URLSearchParams(location.search);
 const hasOw = typeof window.onceworlds === 'object' && window.onceworlds;
@@ -34,11 +35,23 @@ if (!hasOw && params.has('debug')) {
   window.addEventListener('unhandledrejection', (e) => say(`rejection: ${e.reason && (e.reason.stack || e.reason)}`));
 }
 
-if (params.has('poster')) import('./poster.js').then((m) => m.runPoster(params.get('poster')));
-else boot().catch((err) => console.error(err));
+// ?poster=<name>: store art (poster.js). ?poster=screen-<name>[.WxH]: one of the game's screens staged as in real play, in a box
+// of that size when one is given (a debug view to check layouts at phone sizes; players never reach it).
+const POSTER = params.get('poster') ?? '';
+const STAGE = /^screen-[a-z]+([.]\d{2,4}x\d{2,4})?$/.test(POSTER) ? POSTER : '';
+if (POSTER && !STAGE) import('./poster.js').then((m) => m.runPoster(POSTER));
+else
+  boot().catch((err) => {
+    console.error(err);
+    if (STAGE) document.body.dataset.ready = 'error';
+  });
 
 async function boot() {
-  const ow = hasOw || stubOw();
+  const ow = STAGE ? stubOw() : hasOw || stubOw();
+  const stageBox = (() => {
+    const m = /[.](\d+)x(\d+)$/.exec(STAGE);
+    return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
+  })();
   // Join first, before anything heavy, so a reload never misses its seat.
   const roomPromise = joinRoom(ow);
   const AUTOPLAY = params.has('autoplay') && ow.mode !== 'production';
@@ -460,7 +473,7 @@ async function boot() {
         h(
           'div',
           { class: 'solorow' },
-          tag(`Spouts ★ ${totalStars}/36`, { silk: 34, onclick: showSpouts, cls: 'spouts' }),
+          tag(h('span', { class: 'withstar' }, 'Spouts', h('span', { class: 'star on', style: 'font-size:20px' }), `${totalStars}/36`), { silk: 34, onclick: showSpouts, cls: 'spouts', label: `Spouts, ${totalStars} of 36 stars` }),
           tag(monLabel, { silk: 46, onclick: startMonsoon, cls: 'monsoon' }),
           invite,
         ),
@@ -696,7 +709,8 @@ async function boot() {
           }),
         );
       });
-      el.append(list);
+      const nextId = match.round < match.rounds ? cupById(Number(match.settings?.cup) || 1).spouts[match.round] : 0;
+      el.append(list, nextLine(nextId ? `Next · ${spoutById(nextId).name}` : 'Cup podium'));
     });
     if (myPlace === 1 && !match.spectating) sfx('fanfare');
   }
@@ -720,14 +734,38 @@ async function boot() {
           }),
         );
       }
-      el.append(pod);
-      if (mine && !match.spectating) el.append(h('div', { class: 'myline', text: `${ORD(mine.place).toLowerCase()} · ${mine.points} pts` }));
-      if (room?.isHost && room.kind !== 'public' && match.isHost) el.append(tag('Continue', { main: true, silk: 16, onclick: () => safe(() => match.skip()), cls: 'continue' }));
+      const rest = h('div', { class: 'places' });
+      res.slice(3, 6).forEach((s, i) => {
+        const look = lookOf(s.id);
+        rest.append(
+          tag(h('span', { class: 'row' }, h('span', { class: 'pl', text: ORD(s.place) }), h('i', { class: `mark ${look.mark}`, style: `--c:${look.color}` }), h('span', { class: 'nm', text: s.name }), h('span', { class: 'pts', text: `${s.points} pts` })), {
+            silk: 10,
+            delay: 1000 + 120 * i,
+            small: true,
+            cls: s.id === me?.id ? 'mine' : '',
+          }),
+        );
+      });
+      const host = room?.isHost && room.kind !== 'public' && match.isHost;
+      const end = host ? tag(h('span', { class: 'withsecs' }, 'Lobby', secsEl()), { main: true, silk: 16, onclick: () => safe(() => match.skip()), cls: 'continue' }) : nextLine('Lobby');
+      el.append(h('div', { class: 'cuptable' }, pod, h('div', { class: 'tablecol' }, rest, end)));
     });
     if (top[0] && curRun) {
       const r = curRun.byId.get(top[0].id);
       if (r) confettiAt(r, 70);
     }
+  }
+
+  /** The seconds left of a round-end card or the results, kept live by the frame loop. */
+  let secsShown = [];
+  function secsEl() {
+    const el = h('span', { class: 'secs', text: String(Math.max(0, Math.ceil(match?.secondsLeft ?? 0))) });
+    secsShown = [...secsShown.filter((x) => x.isConnected), el];
+    return el;
+  }
+  /** What comes next after this card: a label and its seconds. */
+  function nextLine(text) {
+    return h('div', { class: 'nextline' }, h('span', { text }), secsEl());
   }
 
   function onResults(standings, mine) {
@@ -784,11 +822,11 @@ async function boot() {
 
   function finishSolo(r) {
     const id = solo.id;
-    const time = r.finish;
+    const time = Math.round(r.finish * 100) / 100; // as kept and shown everywhere
     const prevBest = progress.best[id];
     const newBest = !prevBest || time < prevBest;
     const n = starsFor(id, time);
-    progress.best[id] = newBest ? Math.round(time * 100) / 100 : prevBest;
+    progress.best[id] = newBest ? time : prevBest;
     progress.stars[id] = Math.max(progress.stars[id] ?? 0, n);
     progress.open = Math.max(progress.open, Math.min(12, id + 1));
     if (solo.tutorial) progress.tut = true;
@@ -856,7 +894,7 @@ async function boot() {
           h(
             'div',
             { class: 'card' },
-            tag(h('span', { class: 'stack' }, h('span', { class: 'big', text: `${m} m` }), h('span', { class: 'sub', text: m > prevBest && prevBest ? `New best · was ${prevBest} m` : `Best ${progress.mon.best} m · today ${progress.mon.dayBest} m` })), { silk: 40, cls: 'timecard' }),
+            tag(h('span', { class: 'stack' }, h('span', { class: 'big', text: `${m} m` }), h('span', { class: 'sub', text: m > prevBest && prevBest ? `New best · was ${prevBest} m` : progress.mon.dayBest > m ? `Best ${progress.mon.best} m · today ${progress.mon.dayBest} m` : `Best ${progress.mon.best} m · best today` })), { silk: 40, cls: 'timecard' }),
             h('div', { class: 'buttons' }, tag('Again', { main: true, silk: 16, onclick: startMonsoon }), tag('Back', { silk: 26, onclick: toLobby })),
           ),
         ),
@@ -993,7 +1031,7 @@ async function boot() {
   }
 
   function showHint(key, keysText, touchText, opts = {}) {
-    if (AUTOPLAY && params.has('nohints')) return false;
+    if (STAGE || (AUTOPLAY && params.has('nohints'))) return false;
     const count = seen[key] ?? 0;
     if (count >= (opts.times ?? 1) && !opts.always) return false;
     if (hint.key === key && hint.age < hint.life) return true;
@@ -1012,9 +1050,9 @@ async function boot() {
     const list = reserved ?? [];
     const area = list.find((r) => r.kind === target);
     if (area) return { x: area.x + area.w * (target === 'buttons' ? 0.7 : 0.5), y: area.y + area.h * 0.5 };
-    if (target === 'buttons') return { x: innerWidth - 80, y: innerHeight - 90 };
-    if (target === 'stick') return { x: 90, y: innerHeight - 110 };
-    if (target === 'lobby') return { x: innerWidth / 2, y: innerHeight - 44 };
+    if (target === 'buttons') return { x: w - 80, y: hgt - 90 };
+    if (target === 'stick') return { x: 90, y: hgt - 110 };
+    if (target === 'lobby') return { x: w / 2, y: hgt - 44 };
     return null;
   }
 
@@ -1070,8 +1108,16 @@ async function boot() {
   const debrisList = [];
 
   function resize() {
-    w = Math.max(1, innerWidth);
-    hgt = Math.max(1, innerHeight);
+    w = stageBox?.w ?? Math.max(1, innerWidth);
+    hgt = stageBox?.h ?? Math.max(1, innerHeight);
+    // What the CSS would ask the viewport (see style.css): set from this page's own size.
+    uiRoot.classList.toggle('short', hgt <= 460);
+    uiRoot.classList.toggle('wide', w / hgt >= 1.2);
+    uiRoot.style.setProperty('--vw', `${w / 100}px`);
+    if (STAGE) {
+      reserved = stageAreas();
+      if (stageBox) Object.assign(uiRoot.style, { right: 'auto', bottom: 'auto', width: `${w}px`, height: `${hgt}px` });
+    }
     let pr = safe(() => ow.settings.pixelRatio(2)) ?? Math.min(devicePixelRatio || 1, 2);
     pr = Math.min(pr, Math.sqrt(3.6e6 / (w * hgt)));
     fitView(view, w, hgt, pr);
@@ -1225,6 +1271,10 @@ async function boot() {
     } else if (flow === 'race' && curRun?.me && match?.phase === 'round') {
       playHints(curRun.me, dt);
     }
+    if (secsShown.length) {
+      const v = String(Math.max(0, Math.ceil(match?.secondsLeft ?? 0)));
+      for (const el of secsShown) if (el.textContent !== v) el.textContent = v;
+    }
     if (AUTOPLAY) autoplayDriver(real);
     if (hint.text) hint.age += dt;
     if (count) count.age += dt;
@@ -1370,7 +1420,7 @@ async function boot() {
         hs.names = [];
         for (const r of run.racers) {
           const info = run.seatsInfo?.find((s) => s.id === r.id);
-          hs.names.push({ name: r.name, sx: toScreenX(view, r.st.x), sy: toScreenY(view, r.st.y) - 6, color: info?.bot ? 'rgba(243,237,226,0.6)' : info?.me ? '#FFB648' : '#F3EDE2' });
+          hs.names.push({ name: r.name, sx: toScreenX(view, r.st.x), sy: toScreenY(view, r.st.y) - 6, color: info?.bot ? 'rgba(243,237,226,0.6)' : info?.me ? '#FFB648' : '#F3EDE2', ready: !info?.bot && !!info?.ready });
         }
         if (hint.text && hint.age < hint.life) hs.hint = { ...hint, x: w / 2, y: hgt * 0.42, target: hintTarget(hint.target) };
       }
@@ -1390,7 +1440,8 @@ async function boot() {
     // Label: place, clock or metres.
     if (run.kind === 'race') {
       const fin = net?.finishes() ?? {};
-      if (match?.spectating || !me) hs.label = fmtTime(t, true);
+      if (match?.phase === 'results') hs.label = null;
+      else if (match?.spectating || !me) hs.label = fmtTime(t, true);
       else {
         const order = liveOrder(run, fin);
         hs.label = ORD(order.indexOf(me.id) + 1);
@@ -1405,10 +1456,11 @@ async function boot() {
       hs.label = `${Math.floor(Math.max(0, run.best) / M)} m`;
       hs.sub = progress.mon.best ? `Best ${progress.mon.best} m` : null;
     } else if (solo) {
-      hs.label = fmtTime(me?.finish || t);
+      hs.label = fmtTime(me?.finish ? Math.round(me.finish * 100) / 100 : t);
       const best = progress.best[solo.id];
       if (best) hs.sub = `Best ${fmtTime(best)}`;
     }
+    if (flow === 'solo-done' || flow === 'monsoon-done') hs.label = hs.sub = null; // the card says it
     // The climb line.
     const top = run.mon ? Math.max(progress.mon.best * M, run.best + 2500, 3000) : run.level.H;
     const beads = [];
@@ -1426,9 +1478,13 @@ async function boot() {
         hs.names.push({ name: r.name, sx: toScreenX(view, r.st.x), sy: toScreenY(view, r.st.y), color: r.left || r.away ? 'rgba(243,237,226,0.5)' : '#F3EDE2' });
       }
     }
+    // Your best, as a ghost: named.
+    if (solo?.ghost && (flow === 'solo' || flow === 'solo-done') && ghostRacer.st.y > view.y0 && ghostRacer.st.y < view.y1) {
+      (hs.names ??= []).push({ name: 'Best', sx: toScreenX(view, ghostRacer.st.x), sy: toScreenY(view, ghostRacer.st.y), color: 'rgba(243,237,226,0.62)' });
+    }
     // Falling debris coming into view.
     debrisMarks.length = 0;
-    for (const d of debrisComing(run.weather, view.y1, t, 1.2, debrisList)) {
+    for (const d of me?.finish || mon?.doneAt ? [] : debrisComing(run.weather, view.y1, t, 1.2, debrisList)) {
       const x = run.level ? centerXAt(run, view.y1) + (d.d.lane === 'L' ? -68 : 68) : 0;
       debrisMarks.push(toScreenX(view, x));
       if (me?.sp) showHint('debris', 'Caps falling: hold', 'Caps falling: hold', { life: 1.8 });
@@ -1482,11 +1538,150 @@ async function boot() {
     }
   }
 
+  // ------------------------------------------------------------ the debug screens (?poster=screen-<name>[.WxH])
+
+  /** Where the platform's pieces sit in play (its menu at the top left; the lobby bar with Ready/Start at the bottom). */
+  function stageAreas() {
+    const out = [{ kind: 'menu', x: 0, y: 0, w: 140, h: 64, label: 'menu' }];
+    if (/^screen-lobby/.test(STAGE)) out.push({ kind: 'lobby', x: Math.round(w / 2 - Math.min(170, w / 2 - 12)), y: hgt - 12 - 56, w: Math.min(340, w - 24), h: 56, label: 'Ready · Start' });
+    return out;
+  }
+
+  /** Stages one screen as a player meets it, waits for it to settle, then says data-ready. */
+  async function stage(name) {
+    for (const a of reserved ?? []) {
+      const box = h('div', { text: a.label ?? '' });
+      box.style.cssText = `position:fixed;left:${a.x}px;top:${a.y}px;width:${a.w}px;height:${a.h}px;box-sizing:border-box;border:2px dashed rgba(243,237,226,.55);border-radius:${a.kind === 'lobby' ? 999 : 12}px;background:rgba(14,20,27,.55);color:#f3ede2;font:800 14px var(--text);display:flex;align-items:center;justify-content:center;z-index:5;pointer-events:none`;
+      document.body.append(box);
+    }
+    if (stageBox) {
+      const frameBox = h('div', {});
+      frameBox.style.cssText = `position:fixed;left:0;top:0;width:${w}px;height:${hgt}px;box-sizing:content-box;border-right:3px solid #ff3d7f;border-bottom:3px solid #ff3d7f;pointer-events:none;z-index:6`;
+      document.body.append(frameBox);
+    }
+    // A player some way in: six spouts climbed, a Monsoon best.
+    progress.tut = true;
+    progress.open = 7;
+    [3, 3, 2, 3, 1, 2].forEach((n, i) => (progress.stars[i + 1] = n));
+    [24.6, 31.2, 38.9, 44.7, 52.3, 58.1].forEach((t, i) => (progress.best[i + 1] = t));
+    progress.mon.best = 212;
+    progress.mon.day = dayKey(Date.now());
+    progress.mon.dayBest = 64;
+    let settle = 2200;
+    const idle = { x: 0, y: 0, jump: false, hold: false };
+    if (name === 'lobby' || name === 'spouts') {
+      room.stub = false;
+      room.kind = 'private';
+      room.settings.cup = 2;
+      room.players.set('p2', { id: 'p2', name: 'Pip', ready: true, connected: true, presence: null });
+      toLobby();
+      if (name === 'spouts') showSpouts();
+    } else if (name === 'solo') {
+      // Spout 7 climbed by the bot brain; the old best is that same climb slowed down, so its ghost trails a little behind.
+      ghosts.set(7, null);
+      await startSolo(7, false);
+      await new Promise((r) => setTimeout(r, 0));
+      flyover = null;
+      const me = curRun.me;
+      while (!me.finish && curRun.t < 240) advance(curRun, curRun.t + 1 / 60, autoInput(me, 1 / 60));
+      const was = Math.round((me.finish + 4) * 10) / 10;
+      const raw = unpackGhost(packGhost(curRun.recorder, me.finish));
+      const slow = { xs: [], ys: [], as: [], ms: [], t: was };
+      const at = {};
+      for (let i = 0; i <= was * GHOST_HZ; i++) {
+        if (!ghostAt(raw, Math.min((i / GHOST_HZ) * (me.finish / was), raw.xs.length / GHOST_HZ - 0.11), at)) break;
+        slow.xs.push(at.x);
+        slow.ys.push(at.y);
+        slow.as.push(at.a);
+        slow.ms.push(at.m);
+      }
+      progress.best[7] = was;
+      ghosts.set(7, slow);
+      solo.ghost = slow;
+      onMyFinish(me);
+      camSnap = true;
+      settle = 3600;
+    } else if (name === 'monsoon') {
+      startMonsoon();
+      const me = curRun.me;
+      while (!mon.doneAt && curRun.t < 600) advance(curRun, curRun.t + 1 / 60, curRun.t < 50 ? autoInput(me, 1 / 60) : idle, { onDrown: (r) => endMonsoon(r) });
+      camSnap = true;
+      settle = 3400;
+    } else if (name === 'race' || name === 'results') {
+      // The end of a cup: spout 3 just raced (its places), then the cup's podium. You, a friend and four bots.
+      const cup = cupById(1);
+      const seats = [
+        { id: 'me', name: 'You', bot: false, me: true, index: 0 },
+        { id: 'p2', name: 'Pip', bot: false, me: false, index: 1 },
+        ...BOT_NAMES.slice(0, 4).map((n, i) => ({ id: `bot:${i + 2}`, name: n, bot: true, me: false, index: i + 2 })),
+      ];
+      const run = createRun({ kind: 'race', spout: cup.spouts[2], seed: 31, seats: seats.map((x) => ({ ...x, bot: !x.me, skill: [0.5, 0.7, 0.35, 0.6, 0.8, 0.45][x.index] })) });
+      for (const r of run.racers) r.name = seats[r.index].name;
+      useRun(run);
+      while (curRunDone(run) && run.t < 120) advance(run, run.t + 1 / 60, autoInput(run.me, 1 / 60));
+      const ids = seats.map((x) => x.id);
+      const fin = {};
+      const heights = {};
+      for (const r of run.racers) {
+        if (r.finish) fin[r.id] = r.finish;
+        heights[r.id] = r.sp ? r.sp.y : 0;
+      }
+      const ranking = rankRace(ids, fin, heights);
+      const points = pointsFor(ranking);
+      const totals = { me: 23, p2: 21, 'bot:2': 9, 'bot:3': 14, 'bot:4': 26, 'bot:5': 8 };
+      for (const id of ids) totals[id] += points[id] ?? 0;
+      const order = [...ids].sort((a, b) => totals[b] - totals[a]);
+      const standings = order.map((id, i) => ({ id, name: seats.find((x) => x.id === id).name, points: totals[id], place: i + 1, bot: id.startsWith('bot:') }));
+      const final = name === 'results';
+      match = {
+        phase: final ? 'results' : 'roundEnd',
+        paused: false,
+        isHost: true,
+        round: 3,
+        rounds: 3,
+        roundId: 'stage.3',
+        seats: seats.map((x) => ({ ...x, team: 0, away: false, idle: false, left: false })),
+        get present() {
+          return this.seats;
+        },
+        me: { ...seats[0] },
+        spectating: false,
+        scores: totals,
+        standings,
+        results: final ? standings : null,
+        last: final ? null : { ranking, points },
+        data: null,
+        settings: { cup: 1 },
+        secondsLeft: final ? 14 : 4,
+        elapsed: run.t * 1000,
+        on: () => () => {},
+        skip() {},
+        ready() {},
+        start() {},
+      };
+      room.kind = 'private';
+      flow = 'race';
+      clearHint();
+      setControls(false);
+      camSnap = true;
+      if (final) showCupResults();
+      else showRoundEnd();
+    } else showTitle();
+    await new Promise((r) => setTimeout(r, settle));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    document.body.dataset.ready = '1';
+  }
+  /** The staged race runs until four spiders are at the top. */
+  function curRunDone(run) {
+    return run.racers.filter((r) => r.finish).length < 4;
+  }
+
   // ------------------------------------------------------------ go
 
   requestAnimationFrame(frame);
   await connect(roomPromise);
   await Promise.race([loadSaves, new Promise((r) => setTimeout(r, 1500))]);
+  if (STAGE) return stage(STAGE.slice(7).replace(/[.].*$/, ''));
   if (inRacePhase() && amRacing()) enterRace();
   else showTitle();
   if (inRacePhase() && match.phase === 'intro') showSpoutTag();
