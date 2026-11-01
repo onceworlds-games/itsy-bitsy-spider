@@ -31,7 +31,8 @@ export function buildPipe(level, theme = {}) {
   const zincWall = zincMat({ key: 'zincWall', along: true, vertexColors: true, color: new THREE.Color(1.15, 1.2, 1.25) });
   const zincIn = zincMat({ key: 'zincIn', metal: 0.55, rough: 0.8, color: new THREE.Color(0.6, 0.66, 0.72), env: 0.8 });
   const edge = plain('zincEdge', { color: 0xe8eef0, metalness: 1, roughness: 0.28, envMapIntensity: 1.4 });
-  const iron = pbr('MetalPlates013', { tile: 220, metal: 1, rough: 0.9, color: 0x8a7f78, env: 0.8 });
+  // painted iron, half worn through: lit like paint where it holds, metal where it doesn't
+  const iron = pbr('MetalPlates013', { tile: 220, metal: 0.55, rough: 0.85, color: 0x9c9189, env: 1, key: 'pipeIron' });
 
   const leftIn = trimTop(level.left, H);
   const rightIn = trimTop(level.right, H);
@@ -176,10 +177,13 @@ export function buildPipe(level, theme = {}) {
       const wx = sp.cx + s * (sp.half + WALL_T);
       const x0 = s < 0 ? wx - 4 : wx;
       dark.box(x0, y, -D2 - WALL_T, x0 + 4, y + 26, D2 * 0.2);
-      // the ear screwed into the wall
+      // the ear: a strap back to the wall (the pipe stands off it) and a plate screwed on
+      const zWall = -D2 - WALL_T - 36;
       const ex = s < 0 ? wx - 34 : wx;
-      dark.box(ex, y, -D2 - WALL_T - 4, ex + 34, y + 26, -D2 - WALL_T);
-      rivets.push([wx + s * 20, y + 13, -D2 - WALL_T + 1]);
+      dark.box(ex, y + 4, zWall, ex + 34, y + 22, -D2 - WALL_T);
+      const px = s < 0 ? wx - 44 : wx + 4;
+      dark.box(px, y - 4, zWall, px + 40, y + 30, zWall + 4);
+      rivets.push([px + 20, y + 13, zWall + 5]);
     }
   }
   if (dark.count) {

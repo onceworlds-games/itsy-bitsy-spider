@@ -132,7 +132,6 @@ async function boot() {
   const quality = () => safe(() => ow.settings.quality) ?? params.get('q') ?? 'high';
   const reduced = () => !!safe(() => ow.settings.reducedMotion);
   const view = createView(document.getElementById('stage'), { quality: quality(), preserve: !!STAGE || !!SHOT || params.has('shot') });
-  if (params.has('debug')) window.__view = view;
   const juice = view.juice;
   const fx = view.fx;
   const hudCanvas = document.getElementById('hudc');
@@ -2401,6 +2400,7 @@ async function boot() {
     const camQ = params.get('cam')?.split(',').map(Number);
     if (camQ?.length >= 3 && camQ.every(Number.isFinite)) S.cam = { x: camQ[0], y: camQ[1], viewH: camQ[2], lean: camQ[3] ?? 0, rise: camQ[4] ?? 95 };
     if (params.has('t')) S.t = Number(params.get('t')) || S.t;
+    if (params.has('spout')) S.spout = Math.max(1, Math.min(12, Number(params.get('spout')) || S.spout));
     juice.reduced = true;
     hudCanvas.style.display = 'none';
     uiRoot.style.display = 'none';

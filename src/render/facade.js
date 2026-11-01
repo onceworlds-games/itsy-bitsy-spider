@@ -776,8 +776,10 @@ function roof(level, theme, top) {
   fascia.receiveShadow = true;
   g.add(fascia);
   // soffit under the eaves
-  const soffit = new THREE.Mesh(new THREE.BoxGeometry(12000, 20, ZW * -1 - D2 - WALL_T + 40), fasciaMat);
-  soffit.position.set(0, top, (ZW + (-D2 - WALL_T)) / 2);
+  // (it stops behind the pipe's back: it must never show inside the cut-open pipe)
+  const soffitBack = -D2 - WALL_T - 1;
+  const soffit = new THREE.Mesh(new THREE.BoxGeometry(12000, 20, soffitBack - (ZW - 40)), fasciaMat);
+  soffit.position.set(0, top, (soffitBack + ZW - 40) / 2);
   g.add(soffit);
   const pitch = THREE.MathUtils.degToRad(theme.roof?.glass ? 24 : 30);
   // a short pitch up to a ridge, so the sky and the sun are right there above the gutter when you reach the top
@@ -795,8 +797,10 @@ function roof(level, theme, top) {
   plane.castShadow = true;
   g.add(plane);
   // the tiles' front edge: a thick lip
-  const lip = new THREE.Mesh(new THREE.BoxGeometry(12000, 40, 90), tiles);
-  lip.position.set(0, EAVE + 5, -D2 - WALL_T + 20);
+  // (UVs in world units, so its faces show tiles rather than one stretched texel)
+  const lipGeo = new Geo();
+  lipGeo.box(-6000, EAVE - 15, -D2 - WALL_T - 25, 6000, EAVE + 25, -D2 - WALL_T + 65);
+  const lip = new THREE.Mesh(lipGeo.build(1), tiles);
   lip.castShadow = true;
   g.add(lip);
   // the ridge: a row of round capping tiles along the top, the far slope falling away behind it

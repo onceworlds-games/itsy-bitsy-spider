@@ -2,6 +2,7 @@
 // wall, a bucket, crates, a gnome, hay, bins, a buoy. All giants at a spider's size. Plus the shared wind.
 
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { pbr, plain, canvasTex } from './tex.js';
 import { WALL_T, DEPTH } from '../sim/config.js';
 
@@ -240,30 +241,103 @@ function wateringCan(rnd) {
   return g;
 }
 
+// Worn tool steel: brushed grey, scratched, rust freckles, and dried mud up the working end.
+function toolSteelTex() {
+  return canvasTex('toolSteel', 128, 192, (ctx, w, h) => {
+    const g = ctx.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, '#9aa1a7');
+    g.addColorStop(0.5, '#7d8388');
+    g.addColorStop(1, '#8b9095');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    for (let k = 0; k < 260; k++) {
+      ctx.strokeStyle = k % 3 ? 'rgba(255,255,255,0.10)' : 'rgba(20,24,28,0.16)';
+      ctx.lineWidth = 0.6 + Math.random() * 0.8;
+      const x = Math.random() * w;
+      const y = Math.random() * h;
+      const a = -0.25 + Math.random() * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * (6 + Math.random() * 30), y + Math.sin(a) * 8);
+      ctx.stroke();
+    }
+    for (let k = 0; k < 90; k++) {
+      ctx.fillStyle = `rgba(${120 + Math.random() * 60},${60 + Math.random() * 30},30,${0.25 + Math.random() * 0.35})`;
+      ctx.beginPath();
+      ctx.arc(Math.random() * w, Math.random() * h, 0.6 + Math.random() * 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // mud: thick at the bottom, ragged where it stops
+    const mud = ctx.createLinearGradient(0, h, 0, h * 0.45);
+    mud.addColorStop(0, 'rgba(78,56,36,0.95)');
+    mud.addColorStop(0.55, 'rgba(92,68,44,0.7)');
+    mud.addColorStop(1, 'rgba(92,68,44,0)');
+    ctx.fillStyle = mud;
+    ctx.fillRect(0, h * 0.45, w, h * 0.55);
+    for (let k = 0; k < 40; k++) {
+      ctx.fillStyle = `rgba(70,50,32,${0.3 + Math.random() * 0.4})`;
+      ctx.beginPath();
+      ctx.ellipse(Math.random() * w, h * (0.55 + Math.random() * 0.2), 2 + Math.random() * 6, 1 + Math.random() * 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+}
+
 function tools(rnd) {
-  // a rake and a spade leaning on the wall
+  // a rake and a spade leaning on the wall: worn handles, scratched and muddy steel
   const g = new THREE.Group();
   const wood = pbr('WoodSiding008', { tile: [80, 600], color: 0xc89a6a, key: 'handle' });
   const steel = plain('steel', { color: 0x9aa0a6, metalness: 1, roughness: 0.4 });
+  const tex = toolSteelTex();
+  const blade = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.75, roughness: 0.55, envMapIntensity: 0.8 });
   const mk = (x, lean, head) => {
     const t = new THREE.Group();
-    const h = new THREE.Mesh(new THREE.CylinderGeometry(16, 16, 2600, 10), wood);
+    const h = new THREE.Mesh(new THREE.CylinderGeometry(16, 18, 2600, 12), wood);
     h.position.y = 1300;
     t.add(h);
     if (head === 'rake') {
       const bar = new THREE.Mesh(new THREE.BoxGeometry(420, 30, 30), steel);
       t.add(bar);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(14, 22, 110, 10), steel);
+      neck.position.y = 55;
+      t.add(neck);
       for (let k = 0; k < 12; k++) {
         const tine = new THREE.Mesh(new THREE.CylinderGeometry(5, 3, 90, 6), steel);
         tine.position.set(-200 + k * 36, -50, 10);
+        tine.rotation.x = 0.25;
         t.add(tine);
       }
       t.position.y = 90;
     } else {
-      const blade = new THREE.Mesh(new THREE.BoxGeometry(220, 300, 12), steel);
-      blade.position.y = -150;
-      t.add(blade);
-      t.position.y = 300;
+      // a garden spade: square shoulders with a turned tread, sides drawing in to a rounded point, a socket up the handle
+      const W2 = 110;
+      const sh = new THREE.Shape();
+      sh.moveTo(-W2, 0);
+      sh.lineTo(W2, 0);
+      sh.lineTo(W2 - 8, -200);
+      sh.quadraticCurveTo(W2 - 22, -282, 0, -310);
+      sh.quadraticCurveTo(-W2 + 22, -282, -W2 + 8, -200);
+      sh.closePath();
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: 6, bevelEnabled: true, bevelThickness: 3, bevelSize: 3, bevelSegments: 2, curveSegments: 12 });
+      geo.translate(0, 0, -3);
+      // the shape's own coordinates are its UVs: fit the canvas over the blade
+      tex.repeat.set(1 / (W2 * 2), 1 / 310);
+      tex.offset.set(0.5, 1);
+      const b = new THREE.Mesh(geo, blade);
+      b.rotation.x = 0.08; // dished a little
+      t.add(b);
+      const tread = new THREE.Mesh(new THREE.BoxGeometry(W2 * 2 + 6, 10, 26), steel);
+      tread.position.set(0, -4, 8);
+      t.add(tread);
+      const socket = new THREE.Mesh(new THREE.CylinderGeometry(19, 30, 160, 12), steel);
+      socket.position.y = 70;
+      t.add(socket);
+      // a T grip at the top of the handle
+      const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(17, 17, 170, 10), wood);
+      crossbar.rotation.z = Math.PI / 2;
+      crossbar.position.y = 2612;
+      t.add(crossbar);
+      t.position.y = 310;
     }
     t.position.x = x;
     t.rotation.z = lean;
@@ -292,10 +366,44 @@ function bucket(rnd) {
 
 function crates(rnd) {
   const g = new THREE.Group();
-  const wood = pbr('WoodSiding005', { tile: 1, color: 0xd8b088, key: 'crate' });
+  // slatted crates: corner posts, three boards a side with gaps between, a dark inside
+  const wood = pbr('WoodSiding005', { tile: [1, 4], color: 0xd8b088, key: 'crateSlat' });
+  const post = pbr('WoodSiding005', { tile: [4, 1], color: 0xb88c62, key: 'cratePost' });
+  const inside = plain('crateIn', { color: 0x2a1d14, roughness: 1 });
+  const W = 520;
+  const H = 340;
+  const D = 380;
+  const makeCrate = () => {
+    const c = new THREE.Group();
+    const back = new THREE.Mesh(new THREE.BoxGeometry(W - 30, H - 30, D - 30), inside);
+    back.position.y = H / 2;
+    c.add(back);
+    for (let k = 0; k < 3; k++) {
+      const y = 26 + k * 110 + 40;
+      for (const z of [-D / 2 + 9, D / 2 - 9]) {
+        const b = new THREE.Mesh(new THREE.BoxGeometry(W - 20, 84, 18), wood);
+        b.position.set(0, y, z);
+        b.rotation.z = (rnd() - 0.5) * 0.02;
+        c.add(b);
+      }
+      for (const x of [-W / 2 + 9, W / 2 - 9]) {
+        const b = new THREE.Mesh(new THREE.BoxGeometry(18, 84, D - 20), wood);
+        b.position.set(x, y, 0);
+        c.add(b);
+      }
+    }
+    for (const x of [-W / 2 + 22, W / 2 - 22]) {
+      for (const z of [-D / 2 + 22, D / 2 - 22]) {
+        const p = new THREE.Mesh(new THREE.BoxGeometry(44, H, 44), post);
+        p.position.set(x, H / 2, z);
+        c.add(p);
+      }
+    }
+    return c;
+  };
   for (let k = 0; k < 2; k++) {
-    const c = new THREE.Mesh(new THREE.BoxGeometry(520, 340, 380), wood);
-    c.position.set(k * 80 - 40, 170 + k * 340, 0);
+    const c = makeCrate();
+    c.position.set(k * 80 - 40, k * H, 0);
     c.rotation.y = (rnd() - 0.5) * 0.3;
     g.add(c);
   }
@@ -375,20 +483,37 @@ function lantern(rnd) {
 }
 
 function bins(rnd) {
+  // a wheelie bin: a body flaring toward the top, a rounded lid overhanging the front, the handle bar at the back,
+  // a pale label, two wheels on an axle
   const g = new THREE.Group();
   const col = [0x2a5a3a, 0x2a3a5a, 0x5a5a5a][Math.floor(rnd() * 3)];
   const plastic = plain(`bin${col}`, { color: col, roughness: 0.55 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(700, 1300, 720), plastic);
-  body.position.y = 650;
-  const lid = new THREE.Mesh(new THREE.BoxGeometry(740, 60, 780), plastic);
-  lid.position.y = 1330;
-  const wheel = new THREE.Mesh(new THREE.CylinderGeometry(120, 120, 60, 20), plain('rubber', { color: 0x111111, roughness: 0.9 }));
-  wheel.rotation.z = Math.PI / 2;
-  wheel.position.set(-330, 120, -260);
-  const w2 = wheel.clone();
-  w2.position.x = 330;
-  g.add(body, lid, wheel, w2);
-  g.userData.depth = 420;
+  const dark = plain(`binDark${col}`, { color: new THREE.Color(col).multiplyScalar(0.6).getHex(), roughness: 0.6 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(390 * Math.SQRT2, 330 * Math.SQRT2, 1260, 4, 1), plastic);
+  body.rotation.y = Math.PI / 4;
+  body.position.y = 680;
+  const lid = new THREE.Mesh(new RoundedBoxGeometry(820, 60, 840, 3, 22), plastic);
+  lid.position.set(0, 1340, 30);
+  const lip = new THREE.Mesh(new RoundedBoxGeometry(800, 40, 60, 2, 14), dark);
+  lip.position.set(0, 1300, 440);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(26, 26, 640, 10), dark);
+  bar.rotation.z = Math.PI / 2;
+  bar.position.set(0, 1250, -440);
+  const label = new THREE.Mesh(new THREE.PlaneGeometry(300, 200), plain('binLabel', { color: 0xe8e4da, roughness: 0.8 }));
+  label.position.set(0, 860, 372);
+  label.rotation.x = -0.05;
+  const rubber = plain('rubber', { color: 0x111111, roughness: 0.9 });
+  const axle = new THREE.Mesh(new THREE.CylinderGeometry(18, 18, 760, 8), dark);
+  axle.rotation.z = Math.PI / 2;
+  axle.position.set(0, 120, -330);
+  g.add(body, lid, lip, bar, label, axle);
+  for (const x of [-370, 370]) {
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(120, 120, 60, 20), rubber);
+    wheel.rotation.z = Math.PI / 2;
+    wheel.position.set(x, 120, -330);
+    g.add(wheel);
+  }
+  g.userData.depth = 440;
   return g;
 }
 
