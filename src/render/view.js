@@ -159,7 +159,7 @@ export function createView(host, opts = {}) {
 
     // ---- world
     cur.world.update(s.real, { storm: g });
-    const bands = cur.water.update(run.weather, s.t, mood.drizzle, flash);
+    const bands = cur.water.update(run.weather, s.t, mood.drizzle, flash, s.flood);
     cur.water.setLight(sunDir, L.sun.color);
     rain.update(s.real, camera.position, Math.min(1, 0.06 + g * 0.85 + mood.drizzle * 0.3 + (run.def.lightning ? 0.1 : 0)) * (1 - mood.sunny), 0.12 + g * 0.25, flash);
     cur.flies.update(s.real, dt, s.ate ?? null, fx);

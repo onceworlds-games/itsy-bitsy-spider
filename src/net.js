@@ -5,7 +5,8 @@
 // Also: a stand-in for the SDK and a local match for when the page runs without the platform (posters, a plain server).
 
 import { createRun, advance, restoreRacer, heightOf } from './sim/run.js';
-import { pack, knock, bumpVelocity, modeName, modeCode, angleOf } from './sim/spider.js';
+import { pack, knock, bumpVelocity, modeName, modeCode, angleOf, MODE_COUNT } from './sim/spider.js';
+import { COLORS, MARKS, SPECIES_LIST, HAT_LIST, TRAILS, DANCES } from './progress.js';
 import { CUPS, cupById } from './sim/spouts.js';
 import { POINTS, CLOSE_AFTER, ROUND_CAP, STEP } from './sim/config.js';
 import { rankRace, botSkills, pointsFor, cupOrder } from './sim/race.js';
@@ -24,23 +25,25 @@ const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const num = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
 const str = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
 
-/** host:bots, as every page checks it: { r: round id, t: round ms, b: [[id, x, y, angle, mode, grip×10, holding, facing, finish ms]] }. */
+/** host:bots, as every page checks it: { r: round id, t: round ms, b: [[id, x, y, angle, mode, grip×10, holding, facing, snag, finish ms]] }. */
 export function validBots(v) {
   if (v === null) return true;
   if (!isObj(v) || !str(v.r, 80) || !num(v.t, 0, 1e7) || !Array.isArray(v.b) || v.b.length > 8) return false;
   return v.b.every(
     (e) =>
       Array.isArray(e) &&
-      e.length === 9 &&
+      e.length === 10 &&
       str(e[0], 32) &&
       num(e[1], -1e5, 1e5) &&
       num(e[2], -1e4, 2e5) &&
       num(e[3], -1000, 1000) &&
-      num(e[4], 0, 6) &&
+      num(e[4], 0, MODE_COUNT - 1) &&
       num(e[5], 0, 30) &&
       num(e[6], 0, 1) &&
       num(e[7], -1, 1) &&
-      num(e[8], 0, 1e7),
+      Number.isInteger(e[8]) &&
+      num(e[8], -1, 4096) &&
+      num(e[9], 0, 1e7),
   );
 }
 
@@ -51,12 +54,35 @@ export function validRound(v) {
   return keys.length <= 16 && keys.every((k) => k.length <= 64 && num(v.fin[k], 0, 1e7));
 }
 
-/** A player's presence in a race: { v, r, x, y, a, m, g, h, f, d }. Returns a drawing state or null. */
+/**
+ * A player's presence in a race: { v, r, x, y, a, m, g, h, f, k, d, l }. Returns a drawing state (with the surface
+ * normal from the angle, and the snag of a swing when it is one of this level's) or null.
+ */
 export function readPresence(p, rid, level) {
   if (!isObj(p) || p.v !== 1 || p.r !== rid) return null;
   if (!num(p.x, -5000, 5000) || !num(p.y, -600, level.H + 800) || !num(p.a, -1000, 1000)) return null;
-  if (!num(p.m, 0, 6) || !num(p.g, 0, 30) || !num(p.h, 0, 1) || !num(p.f, -1, 1) || !num(p.d, 0, 1e7)) return null;
-  return { x: p.x, y: p.y, a: p.a, m: modeName(p.m | 0), g: p.g / 10, h: p.h === 1, f: p.f < 0 ? -1 : 1, d: p.d };
+  if (!num(p.m, 0, MODE_COUNT - 1) || !num(p.g, 0, 30) || !num(p.h, 0, 1) || !num(p.f, -1, 1) || !num(p.d, 0, 1e7)) return null;
+  const m = modeName(p.m | 0);
+  const k = m === 'swing' && Number.isInteger(p.k) && p.k >= 0 && p.k < level.snags.length ? p.k : -1;
+  const rad = (p.a * Math.PI) / 180;
+  return { x: p.x, y: p.y, a: p.a, m: k < 0 && m === 'swing' ? 'air' : m, g: p.g / 10, h: p.h === 1, f: p.f < 0 ? -1 : 1, k, nx: Math.sin(rad), ny: Math.cos(rad), d: p.d };
+}
+
+const byId = (list) => new Map(list.map((x) => [x.id, x]));
+const LOOK_LISTS = { s: byId(SPECIES_LIST), c: byId(COLORS), m: byId(MARKS), h: byId(HAT_LIST), t: byId(TRAILS), d: byId(DANCES) };
+
+/** A look as presence carries it: the ids of what is worn, joined by dots. */
+export const packLook = (look) => [look.species, look.colorId, look.mark, look.hat, look.trail, look.dance].map((v) => String(v ?? '')).join('.');
+
+/** A look read from presence: only ids from the wardrobe, else null. */
+export function readLook(v) {
+  if (typeof v !== 'string' || v.length > 120) return null;
+  const parts = v.split('.');
+  if (parts.length !== 6) return null;
+  const keys = ['s', 'c', 'm', 'h', 't', 'd'];
+  const got = parts.map((id, i) => LOOK_LISTS[keys[i]].get(id));
+  if (got.some((x) => !x)) return null;
+  return { species: got[0].id, color: got[1].hex, colorId: got[1].id, mark: got[2].id, hat: got[3].id, trail: got[4].id, dance: got[5].id };
 }
 
 export const roundSeed = (rid) => hashString(`round:${rid}`) >>> 0;
@@ -93,6 +119,13 @@ export function seatSkills(cup, seats) {
 export function createNet(env) {
   const { room, host, t } = env;
   const hooks = env.hooks ?? {};
+  const lookStr = () => {
+    try {
+      return env.look ? packLook(env.look()) : '';
+    } catch {
+      return '';
+    }
+  };
   let match = null;
   let cur = null;
   let presAt = 0;
@@ -181,6 +214,9 @@ export function createNet(env) {
     onHazard(r, kind) {
       hooks.onHazard?.(r, kind);
     },
+    onFly(r, f) {
+      hooks.onFly?.(r, f);
+    },
   };
 
   function buildRound() {
@@ -198,7 +234,7 @@ export function createNet(env) {
     const pres = room.me?.presence;
     if (mine && isObj(pres) && pres.r === rid) {
       const st = readPresence(pres, rid, run.level);
-      if (st) restoreRacer(run, mine, [st.x, st.y, st.a, modeCode(st.m), st.g * 10, st.h ? 1 : 0, st.f]);
+      if (st) restoreRacer(run, mine, [st.x, st.y, st.a, modeCode(st.m), st.g * 10, st.h ? 1 : 0, st.f, -1]);
       if (st && st.d) mine.finish = st.d / 1000;
     }
     const snap = botsState.get();
@@ -216,8 +252,8 @@ export function createNet(env) {
     for (const e of snap.b) {
       const r = run.byId.get(e[0]);
       if (!r || !r.bot) continue;
-      restoreRacer(run, r, e.slice(1, 8));
-      if (e[8] && !r.finish) r.finish = e[8] / 1000;
+      restoreRacer(run, r, e.slice(1, 9));
+      if (e[9] && !r.finish) r.finish = e[9] / 1000;
       if (r.finish) r.sp.mode = 'done';
     }
   }
@@ -256,7 +292,12 @@ export function createNet(env) {
       st.g = near[5] / 10;
       st.h = near[6] === 1;
       st.f = near[7] < 0 ? -1 : 1;
-      if (eb[8] && !r.finish) r.finish = eb[8] / 1000;
+      st.k = st.m === 'swing' && near[8] >= 0 && near[8] < cur.run.level.snags.length ? near[8] : -1;
+      if (st.m === 'swing' && st.k < 0) st.m = 'air';
+      const rad = (st.a * Math.PI) / 180;
+      st.nx = Math.sin(rad);
+      st.ny = Math.cos(rad);
+      if (eb[9] && !r.finish) r.finish = eb[9] / 1000;
     }
   }
 
@@ -271,6 +312,11 @@ export function createNet(env) {
       const st = readPresence(p, cur.rid, run.level);
       if (!st) continue;
       Object.assign(r.st, st);
+      if (p.l !== r.lookKey) {
+        r.lookKey = p.l;
+        const look = readLook(p.l);
+        if (look) r.look = look;
+      }
       if (st.d && !r.finish) r.finish = st.d / 1000;
     }
   }
@@ -289,7 +335,9 @@ export function createNet(env) {
       g: Math.round(sp.grip * 10),
       h: sp.holding ? 1 : 0,
       f: sp.facing < 0 ? -1 : 1,
+      k: sp.mode === 'swing' ? sp.snag : -1,
       d: r.finish ? Math.round(r.finish * 1000) : 0,
+      l: lookStr(),
     });
     void force;
   }
@@ -439,6 +487,7 @@ export function stubOw() {
       (listeners[ev] ??= []).push(fn);
     },
     rooms: { join: async () => stubRoom() },
+    data: { game: { get: async () => null, add: async () => null, push: async () => null, best: async () => null } },
     env: {},
   };
 }

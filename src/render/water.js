@@ -36,6 +36,7 @@ const frag = /* glsl */ `
   uniform vec3 uDeep;
   uniform vec3 uSky;
   uniform float uFlash;
+  uniform float uFlood;
   varying vec3 vW;
   varying vec3 vN;
   varying float vSide;
@@ -75,6 +76,13 @@ const frag = /* glsl */ `
       film = max(film, (1.0 - smoothstep(0.0, 900.0, y - b.y)) * step(b.y, y) * 0.55);
     }
     float dry = dryAt(vW.xy);
+    // Monsoon's flood: the pipe full of churning water below its surface, foam along the top of it
+    float floodD = uFlood - y;
+    float flooded = smoothstep(-6.0, 4.0, floodD + (noise(vec2(vW.x * 0.04, uTime * 2.0)) - 0.5) * 14.0);
+    dry *= 1.0 - flooded;
+    wet = max(wet, flooded);
+    foam = max(foam, flooded * exp(-max(0.0, floodD) / 22.0));
+    strength = max(strength, flooded);
     wet *= 1.0 - dry;
     foam *= 1.0 - dry;
     film *= 1.0 - dry;
@@ -126,6 +134,7 @@ export function createWater(level, outline) {
     uDeep: { value: new THREE.Color(0.12, 0.32, 0.42) },
     uSky: { value: new THREE.Color(0.55, 0.78, 0.92) },
     uFlash: { value: 0 },
+    uFlood: { value: -1e6 },
   };
   const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: vert, fragmentShader: frag, transparent: true, depthWrite: false, side: THREE.DoubleSide });
   // dry spots: their boxes
@@ -168,8 +177,9 @@ export function createWater(level, outline) {
     mesh,
     uniforms,
     /** Sets the water for time t from the weather; drizzle 0..1 before a flush. Returns the bands (for effects). */
-    update(weather, t, drizzle, flash) {
+    update(weather, t, drizzle, flash, flood = null) {
       uniforms.uTime.value = t;
+      uniforms.uFlood.value = flood ?? -1e6;
       uniforms.uDrizzle.value = drizzle;
       uniforms.uFlash.value = flash ?? 0;
       let n = 0;

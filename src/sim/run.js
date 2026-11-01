@@ -125,6 +125,13 @@ export function advance(run, target, input, hooks = {}) {
   let n = 0;
   if (target - run.t > 1.5) run.t = target - 1.5;
   while (run.t + STEP <= target + 1e-9 && n < 240) {
+    // where everyone was before this step: the picture interpolates from here to the step's result
+    for (const r of run.racers) {
+      if (r.sp) {
+        r.px = r.sp.x;
+        r.py = r.sp.y;
+      }
+    }
     stepOnce(run, input, hooks);
     if (input) input.jump = false;
     run.t += STEP;
@@ -132,6 +139,8 @@ export function advance(run, target, input, hooks = {}) {
     if (hooks.onStep) hooks.onStep(run);
   }
   syncAll(run);
+  // how far the picture is between the last step and the next (0..1)
+  run.alpha = Math.max(0, Math.min(1, (target - run.t) / STEP));
   return n;
 }
 
