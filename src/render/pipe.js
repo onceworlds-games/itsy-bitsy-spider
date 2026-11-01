@@ -4,6 +4,7 @@
 // old cobwebs in every dry spot, the drain at the foot and the gutter at the top.
 
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { Geo, offsetLine, cumLen } from './geo.js';
 import { pbr, plain, canvasTex, rand } from './tex.js';
 import { zincMat, edgeMat } from './zinc.js';
@@ -595,22 +596,81 @@ function centerAt(level, y) {
 
 // ------------------------------------------------------------------------------------------------ the drain and the gutter
 
+/** The drain's opening in the ground (the ground is cut around it). */
+export function drainHole(level) {
+  const sp = level.spans[0];
+  return { x0: sp.cx - sp.half - WALL_T - 16, x1: sp.cx + sp.half + WALL_T + 16, z0: -D2 - WALL_T - 14, z1: D2 + 30 };
+}
+
 function drainMesh(level) {
   const g = new THREE.Group();
-  const sp = level.spans[0];
-  const half = sp.half;
-  const x0 = sp.cx - half;
-  const x1 = sp.cx + half;
-  const iron = plain('castIron', { color: 0x2a2b2d, metalness: 0.85, roughness: 0.55 });
-  const bars = new Geo();
-  // a cast grate: a frame and slots, its top flush with the floor the spiders stand on
-  bars.box(x0 - WALL_T - 30, -10, -D2 - WALL_T - 30, x1 + WALL_T + 30, 0, D2 + 40);
-  const grate = new THREE.Mesh(bars.build(80), iron);
-  grate.receiveShadow = true;
-  g.add(grate);
-  const slots = new Geo();
-  for (let x = x0 + 14; x < x1 - 10; x += 22) slots.box(x, -9, -D2 + 10, x + 10, 0.4, D2 + 26);
-  g.add(new THREE.Mesh(slots.build(1), new THREE.MeshBasicMaterial({ color: 0x030304 })));
+  const rnd = rand(97);
+  // a cast-iron gully grate set in a concrete kerb, its top flush with the floor the spiders stand on; under the bars,
+  // a dark pit with a skin of water that catches the light
+  const { x0: gx0, x1: gx1, z0: gz0, z1: gz1 } = drainHole(level);
+  const K = 34; // the kerb's width
+  const kerb = pbr('Concrete036', { tile: 260, color: 0xb9b4aa, key: 'drainKerb', normal: 1.4 });
+  const kg = new Geo();
+  kg.box(gx0 - K, -3, gz0 - K, gx1 + K, 0.4, gz0);
+  kg.box(gx0 - K, -3, gz1, gx1 + K, 0.4, gz1 + K);
+  kg.box(gx0 - K, -3, gz0, gx0, 0.4, gz1);
+  kg.box(gx1, -3, gz0, gx1 + K, 0.4, gz1);
+  const km = new THREE.Mesh(kg.build(1), kerb);
+  km.receiveShadow = true;
+  g.add(km);
+
+  const iron = pbr('MetalPlates013', { tile: 90, metal: 1, rough: 1.1, color: 0x8a8079, env: 1.1, key: 'drainIron', normal: 1.6 });
+  // the grate's rim
+  const rim = new Geo();
+  const RW = 9;
+  rim.box(gx0, -12, gz0, gx1, 0, gz0 + RW);
+  rim.box(gx0, -12, gz1 - RW, gx1, 0, gz1);
+  rim.box(gx0, -12, gz0 + RW, gx0 + RW, 0, gz1 - RW);
+  rim.box(gx1 - RW, -12, gz0 + RW, gx1, 0, gz1 - RW);
+  const rm = new THREE.Mesh(rim.build(1), iron);
+  rm.receiveShadow = true;
+  rm.castShadow = true;
+  g.add(rm);
+  // the bars, front to back, rounded so their tops catch the light; one cross bar through the middle
+  const inX0 = gx0 + RW;
+  const inX1 = gx1 - RW;
+  const n = Math.max(6, Math.round((inX1 - inX0) / 21));
+  const pitch = (inX1 - inX0) / n;
+  const barW = pitch * 0.56;
+  const len = gz1 - gz0 - RW * 2;
+  const barGeo = new RoundedBoxGeometry(barW, 14, len + 4, 3, 3.2);
+  const bars = new THREE.InstancedMesh(barGeo, iron, n - 1);
+  const m4 = new THREE.Matrix4();
+  const tint = new THREE.Color();
+  for (let i = 1; i < n; i++) {
+    m4.makeTranslation(inX0 + i * pitch, -6.6, (gz0 + gz1) / 2);
+    bars.setMatrixAt(i - 1, m4);
+    // a little rust on some
+    tint.setRGB(1, 1, 1).lerp(new THREE.Color(1.25, 0.82, 0.6), rnd() * rnd() * 0.8);
+    bars.setColorAt(i - 1, tint);
+  }
+  bars.castShadow = true;
+  bars.receiveShadow = true;
+  g.add(bars);
+  const cross = new THREE.Mesh(new RoundedBoxGeometry(inX1 - inX0 + 4, 10, 9, 2, 3), iron);
+  cross.position.set((inX0 + inX1) / 2, -7, (gz0 + gz1) / 2);
+  cross.receiveShadow = true;
+  g.add(cross);
+  // the pit: dark walls and water a little way down
+  const pit = new Geo();
+  const P = 46;
+  pit.face([[inX0, -P, gz0 + RW], [inX1, -P, gz0 + RW], [inX1, -12, gz0 + RW], [inX0, -12, gz0 + RW]], [0, 0, 1], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+  pit.faceAuto([[inX0, -P, gz1 - RW], [inX1, -P, gz1 - RW], [inX1, -12, gz1 - RW], [inX0, -12, gz1 - RW]], [0, 0, -1], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+  pit.faceAuto([[inX0, -P, gz0], [inX0, -P, gz1], [inX0, -12, gz1], [inX0, -12, gz0]], [1, 0, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+  pit.faceAuto([[inX1, -P, gz0], [inX1, -P, gz1], [inX1, -12, gz1], [inX1, -12, gz0]], [-1, 0, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+  g.add(new THREE.Mesh(pit.build(1), new THREE.MeshLambertMaterial({ color: 0x120f0c })));
+  const water = new THREE.Mesh(
+    new THREE.PlaneGeometry(inX1 - inX0, gz1 - gz0),
+    new THREE.MeshLambertMaterial({ color: 0x06090a }),
+  );
+  water.rotation.x = -Math.PI / 2;
+  water.position.set((inX0 + inX1) / 2, -30, (gz0 + gz1) / 2);
+  g.add(water);
   return g;
 }
 

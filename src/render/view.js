@@ -50,6 +50,7 @@ export function createView(host, opts = {}) {
   const sunDir = new THREE.Vector3(-0.32, 0.78, 0.54).normalize();
   const mood = { calm: 1, gloom: 0, drizzle: 0, flash: 0, sunny: 0, storm: 0 };
   const camState = { x: 0, y: 0, viewH: 560, lean: 0 };
+  let portraitOn = false;
 
   function show(run) {
     if (cur?.run === run) return;
@@ -141,6 +142,12 @@ export function createView(host, opts = {}) {
     sky.uniforms.flash.value = flash;
     sky.uniforms.time.value = s.real;
     if (stage.bloom) stage.bloom.strength = 0.42 + mood.sunny * 0.08 + flash * 0.4;
+    if (portraitOn) {
+      if (stage.bloom) stage.bloom.strength = 0.16;
+      gu.sat.value = 1.2;
+      gu.vignette.value = 0.45;
+      gu.grain.value = 0;
+    }
 
     // ---- camera
     const c = s.cam;
@@ -233,7 +240,7 @@ export function createView(host, opts = {}) {
     for (const [id, rig] of cur.rigs) if (!seen.has(id)) rig.setVisible(false);
 
     fx.update(dt);
-    stage.render(dt, s.real);
+    if (!s.noDraw) stage.render(dt, s.real);
   }
 
   function project(x, y, z = 0, out = {}) {
@@ -266,6 +273,32 @@ export function createView(host, opts = {}) {
     setPayoff(sun, rb) {
       PAYOFF_SUN.set(sun[0], sun[1], sun[2]).normalize();
       sky.uniforms.rbDir.value.set(rb[0], rb[1], rb[2]).normalize();
+    },
+    /** A portrait for the store icon: the spiders alone in front of a sunburst sky (colours: centre, mid, edge). */
+    portrait(cols) {
+      if (!cur) return;
+      for (const o of [cur.world.group, cur.water.mesh, cur.flies.group, cur.debris.group, cur.birds.group, sky.dome, sky.skyline, rain.mesh, fx.mesh]) o.visible = false;
+      portraitOn = true;
+      const c = document.createElement('canvas');
+      c.width = c.height = 512;
+      const x = c.getContext('2d');
+      const g = x.createRadialGradient(256, 236, 10, 256, 236, 380);
+      g.addColorStop(0, cols[0]);
+      g.addColorStop(0.2, cols[1]);
+      g.addColorStop(1, cols[2]);
+      x.fillStyle = g;
+      x.fillRect(0, 0, 512, 512);
+      x.globalCompositeOperation = 'soft-light';
+      x.fillStyle = 'rgba(255,255,255,0.5)';
+      for (let k = 0; k < 16; k += 2) {
+        x.beginPath();
+        x.moveTo(256, 236);
+        x.arc(256, 236, 600, (k / 16) * Math.PI * 2, ((k + 1) / 16) * Math.PI * 2);
+        x.fill();
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      scene.background = t;
     },
     setQuality(q) {
       stage.setQuality(q);

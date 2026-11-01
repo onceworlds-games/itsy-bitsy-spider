@@ -9,6 +9,7 @@ import { pbr, plain, canvasTex, rand } from './tex.js';
 import { roomTex, stainedTex, rainGlassNormal, ivyLeafTex, curtainTex, stainTex } from './paint.js';
 import { buildProps, windMaterial, wind } from './props.js';
 import { DEPTH, WALL_T } from '../sim/config.js';
+import { drainHole } from './pipe.js';
 
 const D2 = DEPTH / 2;
 export const ZW = -D2 - WALL_T - 36; // the wall's face
@@ -261,7 +262,13 @@ export function buildFacade(level, theme) {
   const ground = theme.ground;
   {
     const g = new Geo();
-    g.face([[X0 * 2, -0.6, ZW], [X1 * 2, -0.6, ZW], [X1 * 2, -0.6, 9000], [X0 * 2, -0.6, 9000]], [0, 1, 0], [[X0 * 2, ZW], [X1 * 2, ZW], [X1 * 2, 9000], [X0 * 2, 9000]]);
+    // cut round the drain
+    const d = drainHole(level);
+    const rect = (ax, az, bx, bz) => g.faceAuto([[ax, -0.6, az], [bx, -0.6, az], [bx, -0.6, bz], [ax, -0.6, bz]], [0, 1, 0], [[ax, az], [bx, az], [bx, bz], [ax, bz]]);
+    rect(X0 * 2, ZW, d.x0, 9000);
+    rect(d.x1, ZW, X1 * 2, 9000);
+    rect(d.x0, ZW, d.x1, d.z0);
+    rect(d.x0, d.z1, d.x1, 9000);
     const gm = pbr(ground.id, { tile: ground.tile, color: ground.color, key: `ground:${theme.key}`, normal: 1.2 });
     const m = new THREE.Mesh(g.build(1), gm);
     m.receiveShadow = true;

@@ -230,6 +230,25 @@ export function drawHud(ctx, h) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+    if (m.combo) {
+      // the combo: a gold disc beside the chevron, its rim draining as the time to keep it going runs out
+      const x = m.sx + 30;
+      const y = m.sy - 40 + bob;
+      const r = m.combo >= 10 ? 17 : 15;
+      ctx.fillStyle = m.combo >= 10 ? GOLD : BONE;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = m.comboK > 0.3 ? 'rgba(14,20,27,0.75)' : BRICK;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, r - 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(m.comboK, 0, 1));
+      ctx.stroke();
+      stamp(ctx, `×${m.combo}`, x, y + 1, m.combo >= 10 ? 13 : 12);
+    }
     if (m.grip < 0.999) {
       const k = clamp(m.grip, 0, 1);
       ctx.lineCap = 'round';

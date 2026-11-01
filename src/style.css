@@ -781,6 +781,9 @@ button.tag[disabled] .face {
 :where(.short) .goalcard .gh {
   display: none;
 }
+:where(.short) .goal.week {
+  display: none;
+}
 :where(.short) .solorow .face {
   min-width: 120px;
   font-size: 18px;
@@ -902,6 +905,15 @@ button.tag[disabled] .face {
 }
 .goal.done .bar i {
   background: linear-gradient(#c8f0a8, #5fae3a);
+}
+.goalcard .gh.wk {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 2px dashed rgba(14, 20, 27, 0.25);
+  font-size: 15px;
+}
+.goal.week .bar i {
+  background: linear-gradient(#ffe7a0, #e09a20);
 }
 .chest {
   display: flex;

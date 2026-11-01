@@ -156,6 +156,7 @@ export function freshSave() {
     n: { held: 0, perfect: 0, washes: 0, races: 0, wins: 0, cups: 0, flies: 0, gold: 0, swings: 0, climbs: 0 },
     look: { species: 'jumper', color: 'gold', mark: 'ring', hat: 'none', trail: 'none', dance: 'wave' },
     day: { key: '', goals: [], chest: false },
+    week: { key: '', goal: null },
     streak: { n: 0, last: '', best: 0 },
     seen: {},
     lastLevel: 1,
@@ -195,6 +196,11 @@ export function cleanSave(raw) {
       s.day.goals = raw.day.goals.slice(0, 3).filter((g) => g && GOAL_KINDS[g.kind]).map((g) => ({ kind: g.kind, n: Math.round(num(g.n, 1, 1000, 1)), have: Math.floor(num(g.have, 0, 1e6, 0)), done: !!g.done }));
     }
   }
+  if (raw.week && typeof raw.week === 'object') {
+    s.week.key = strv(raw.week.key, 10);
+    const g = raw.week.goal;
+    if (g && typeof g === 'object' && WEEK_KINDS[g.kind]) s.week.goal = { kind: g.kind, n: Math.round(num(g.n, 1, 10000, 1)), have: Math.floor(num(g.have, 0, 1e6, 0)), done: !!g.done };
+  }
   if (raw.streak && typeof raw.streak === 'object') {
     s.streak.n = Math.floor(num(raw.streak.n, 0, 1e4, 0));
     s.streak.best = Math.floor(num(raw.streak.best, 0, 1e4, 0));
@@ -230,11 +236,14 @@ export const SILK = {
   metre: 0.2,
   goal: 60,
   chest: 150,
+  week: 500,
+  combo: 2, // per step of the climb's best combo, from ×3
+  comboCap: 40,
 };
 
 /**
  * The silk for one go, as lines for the results card. c: { kind: 'solo'|'race'|'monsoon'|'tutorial', spout, finished,
- * newStars, flies, gold, perfect, swings, place, metres }.
+ * newStars, flies, gold, perfect, swings, place, metres, combo }.
  */
 export function climbReward(c) {
   const lines = [];
@@ -247,6 +256,7 @@ export function climbReward(c) {
   if (c.gold) add('Golden fly', SILK.gold);
   if (c.perfect > 0) add(`Perfect holds ×${c.perfect}`, c.perfect * SILK.perfect);
   if (c.swings > 0) add(`Swings ×${c.swings}`, Math.min(SILK.swingCap, c.swings * SILK.swing));
+  if (c.combo >= 3) add(`Best combo ×${c.combo}`, Math.min(SILK.comboCap, c.combo * SILK.combo));
   return { lines, total: lines.reduce((a, l) => a + l.silk, 0) };
 }
 
@@ -288,6 +298,7 @@ export const GOAL_KINDS = {
   race: { label: (n) => `Finish ${n} races`, short: 'Races', range: [2, 3] },
   monsoon: { label: (n) => `Reach ${n} m in Monsoon`, short: 'Monsoon metres', range: [40, 90], best: true },
   gold: { label: () => 'Catch a golden fly', short: 'Golden fly', range: [1, 1] },
+  combo: { label: (n) => `Reach a ×${n} combo`, short: 'Best combo', range: [6, 12], best: true },
 };
 
 /** Today's three goals, the same for everyone: three different kinds, rounded amounts. */
@@ -303,11 +314,43 @@ export function goalsFor(day) {
   });
 }
 
-/** Moves the save to today: new goals, and the streak broken if a day was missed. */
+// The goal of the week: one big one, the same for everyone from Monday to Sunday (UTC), worth a lot of silk.
+export const WEEK_KINDS = {
+  flies: { range: [100, 160] },
+  perfect: { range: [30, 50] },
+  swing: { range: [50, 90] },
+  climb: { range: [14, 22] },
+  held: { range: [70, 110] },
+  race: { range: [10, 16] },
+  monsoon: { range: [140, 200] },
+  combo: { range: [16, 24] },
+};
+
+/** The Monday (UTC) of a "YYYY-MM-DD" day's week. */
+export function weekOf(day) {
+  const t = Date.parse(`${day}T12:00:00Z`);
+  if (!Number.isFinite(t)) return '';
+  const dow = (new Date(t).getUTCDay() + 6) % 7;
+  return new Date(t - dow * 86400000).toISOString().slice(0, 10);
+}
+
+/** This week's goal, the same for everyone. */
+export function weekGoalFor(week) {
+  const rng = makeRng(`week:${week}`);
+  const kind = rng.pick(Object.keys(WEEK_KINDS));
+  const [lo, hi] = WEEK_KINDS[kind].range;
+  let n = rng.int(lo, hi);
+  n = n >= 50 ? Math.round(n / 10) * 10 : n >= 20 ? Math.round(n / 5) * 5 : n;
+  return { kind, n, have: 0, done: false };
+}
+
+/** Moves the save to today: new goals (and a new week's goal on Monday), and the streak broken if a day was missed. */
 export function rollDay(save, day) {
   if (save.day.key !== day) {
     save.day = { key: day, goals: goalsFor(day), chest: false };
   }
+  const wk = weekOf(day);
+  if (wk && save.week.key !== wk) save.week = { key: wk, goal: weekGoalFor(wk) };
   if (save.streak.last && save.streak.last !== day && save.streak.last !== prevDay(day)) save.streak.n = 0;
 }
 
@@ -324,7 +367,17 @@ export function prevDay(day) {
  */
 export function track(save, kind, n, day) {
   rollDay(save, day);
-  const out = { done: [], chest: false, silk: 0 };
+  const out = { done: [], chest: false, silk: 0, week: null };
+  const wg = save.week.goal;
+  if (wg && wg.kind === kind && !wg.done) {
+    wg.have = GOAL_KINDS[kind].best ? Math.max(wg.have, Math.floor(n)) : wg.have + Math.floor(n);
+    if (wg.have >= wg.n) {
+      wg.have = wg.n;
+      wg.done = true;
+      out.week = wg;
+      out.silk += SILK.week;
+    }
+  }
   for (const g of save.day.goals) {
     if (g.kind !== kind || g.done) continue;
     g.have = GOAL_KINDS[kind].best ? Math.max(g.have, Math.floor(n)) : g.have + Math.floor(n);

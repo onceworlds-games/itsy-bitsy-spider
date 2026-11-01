@@ -298,7 +298,8 @@ async function boot() {
   let lobbyKey = '';
   let attract = null;
   let paused = false;
-  let shot = null; // store art: { t, frozen, done, sunny }
+  // store art: { t, frozen, done, sunny, ... }; until it is staged nothing is drawn (posters run on software renderers)
+  let shot = SHOT ? { manual: true } : null;
   let posterCam = null;
   let solo = null; // { id, tutorial, ghost, doneAt }
   let mon = null; // { day, doneAt }
@@ -315,12 +316,18 @@ async function boot() {
   const amRacing = () => !!match && !!match.me && !match.spectating;
 
   /** What one go earns, counted as it happens. */
-  const newTally = () => ({ perfect: 0, flies: 0, gold: false, swings: 0, held: 0, mask: 0 });
+  const newTally = () => ({ perfect: 0, flies: 0, gold: false, swings: 0, held: 0, mask: 0, combo: 0 });
   let tally = newTally();
+  // The combo: flies, swings, perfect holds and flushes held one after another, each within COMBO_T of the last (the
+  // clock stops while you hold). A wash-out, a knock or a snapped thread breaks it; the best of a climb pays silk.
+  const COMBO_T = 3;
+  const combo = { n: 0, left: 0, at: 0 };
 
   function useRun(r) {
     if (curRun !== r) {
       tally = newTally();
+      combo.n = 0;
+      combo.left = 0;
       was.clear();
       trailAt.clear();
       pops.length = 0;
@@ -541,7 +548,20 @@ async function boot() {
     }
     const nextStreak = save.streak.last === today() ? save.streak.n : save.streak.n + 1;
     const chest = h('div', { class: `chest ${save.day.chest ? 'open' : ''}` }, h('span', { class: 'box' }), h('span', { text: save.day.chest ? 'Chest opened' : `Chest +${P.chestSilk(nextStreak)}` }));
-    return tag(h('span', { class: 'stack goalcard' }, h('span', { class: 'gh', text: 'Today' }), list, chest), { silk: 14, cls: 'goaltag', delay: 120 });
+    const wg = save.week.goal;
+    const week = wg
+      ? h(
+          'div',
+          { class: `goal week ${wg.done ? 'done' : ''}` },
+          h('span', { class: 'gl', text: P.GOAL_KINDS[wg.kind].label(wg.n) }),
+          h('span', { class: 'bar' }, h('i', { style: `width:${Math.round((wg.have / wg.n) * 100)}%` })),
+          h('span', { class: 'gn', text: wg.done ? '✓' : `${wg.have}/${wg.n}` }),
+        )
+      : null;
+    return tag(
+      h('span', { class: 'stack goalcard' }, h('span', { class: 'gh', text: 'Today' }), list, chest, ...(week ? [h('span', { class: 'gh wk', text: `This week · +${P.SILK.week}` }), week] : [])),
+      { silk: 14, cls: 'goaltag', delay: 120 },
+    );
   }
 
   function changeCup(d) {
@@ -848,7 +868,7 @@ async function boot() {
         got.push(P.track(save, 'climb', 1, day));
         if (mine.sp && mine.sp.stats.washes === 0) got.push(P.track(save, 'dry', 1, day));
       }
-      reward = P.climbReward({ kind: 'race', spout: curRun.def.id, finished: !!mine?.finish, place: myPlace, flies: tally.flies, gold: tally.gold, perfect: tally.perfect, swings: tally.swings });
+      reward = P.climbReward({ kind: 'race', spout: curRun.def.id, finished: !!mine?.finish, place: myPlace, flies: tally.flies, gold: tally.gold, perfect: tally.perfect, swings: tally.swings, combo: tally.combo });
       goalsDone(got);
       grant(reward.total + got.reduce((a, g) => a + g.silk, 0));
       shareHeld();
@@ -990,13 +1010,14 @@ async function boot() {
   function goalsDone(results) {
     for (const r of results) {
       for (const g of r.done) toast(P.GOAL_KINDS[g.kind].label(g.n), `Goal · +${P.SILK.goal} silk`, 'goal');
+      if (r.week) toast(P.GOAL_KINDS[r.week.kind].label(r.week.n), `This week's goal · +${P.SILK.week} silk`, 'chest');
       if (r.chest) toast('Chest opened', `+${P.chestSilk(save.streak.n)} silk · ${save.streak.n} day streak`, 'chest');
     }
   }
   function trackNow(kind, n) {
     if (STAGE) return;
     const r = P.track(save, kind, n, today());
-    if (r.done.length || r.chest) {
+    if (r.done.length || r.chest || r.week) {
       goalsDone([r]);
       grant(r.silk);
       saveProgress();
@@ -1072,7 +1093,7 @@ async function boot() {
     const day = today();
     const got = [P.track(save, 'climb', 1, day)];
     if (dry) got.push(P.track(save, 'dry', 1, day));
-    const reward = P.climbReward({ kind: tutorial ? 'tutorial' : 'solo', spout: id, finished: true, newStars: rec.newStars, flies: rec.newFlies, gold: rec.newGold, perfect: tally.perfect, swings: tally.swings });
+    const reward = P.climbReward({ kind: tutorial ? 'tutorial' : 'solo', spout: id, finished: true, newStars: rec.newStars, flies: rec.newFlies, gold: rec.newGold, perfect: tally.perfect, swings: tally.swings, combo: tally.combo });
     const before = P.levelOf(save.silk);
     grant(reward.total + got.reduce((a, g) => a + g.silk, 0));
     goalsDone(got);
@@ -1178,7 +1199,7 @@ async function boot() {
     }
     const day = today();
     const got = STAGE ? [] : [P.track(save, 'monsoon', m, day)];
-    const reward = P.climbReward({ kind: 'monsoon', metres: m, flies: tally.flies, perfect: tally.perfect, swings: tally.swings });
+    const reward = P.climbReward({ kind: 'monsoon', metres: m, flies: tally.flies, perfect: tally.perfect, swings: tally.swings, combo: tally.combo });
     const before = P.levelOf(save.silk);
     if (!STAGE) {
       grant(reward.total + got.reduce((a, g) => a + g.silk, 0));
@@ -1261,8 +1282,30 @@ async function boot() {
     }
   }
 
-  let flyChain = 0;
-  let flyChainAt = 0;
+  /** Adds to your combo; true when it popped its count over the spider. */
+  function comboAdd(r, k) {
+    if (!r.me || r.finish) return false;
+    combo.n += k;
+    combo.left = COMBO_T;
+    combo.at = performance.now() / 1000;
+    tally.combo = Math.max(tally.combo, combo.n);
+    if (combo.n < 2) return false;
+    sfx('combo', combo.n);
+    pop(r, `×${combo.n}`, combo.n >= 10 ? '#FFD060' : '#F3EDE2', combo.n >= 10);
+    if (combo.n === 10 || combo.n === 20) juice.punchIn(0.25);
+    trackNow('combo', combo.n);
+    return true;
+  }
+  function comboBreak(r) {
+    if (!r.me) return;
+    if (combo.n >= 4) {
+      sfx('comboLost');
+      pop(r, 'Combo lost', '#FF9A7A');
+    }
+    combo.n = 0;
+    combo.left = 0;
+  }
+
   function flyFx(r, f) {
     if (r.me) {
       if (f.gold) {
@@ -1276,16 +1319,14 @@ async function boot() {
         fx.ring(f.x, f.y, 50, [3, 2.2, 0.6]);
         pop(r, 'Golden fly!', '#FFD060', true);
         trackNow('gold', 1);
+        comboAdd(r, 3);
       } else {
         tally.flies++;
         tally.mask |= 1 << Math.min(29, flyIndex(f));
         save.n.flies++;
-        const now = performance.now() / 1000;
-        flyChain = now - flyChainAt < 2.2 ? flyChain + 1 : 0;
-        flyChainAt = now;
-        sfx('fly', flyChain);
+        sfx('fly', combo.n);
         fx.glint(f.x, f.y, 0, 9, [2.4, 2.4, 2]);
-        pop(r, flyChain > 0 ? `×${flyChain + 1}` : '+1', '#F3EDE2');
+        if (!comboAdd(r, 1)) pop(r, '+1', '#F3EDE2');
         trackNow('flies', 1);
       }
     } else if (onScreen(r)) fx.glint(f.x, f.y, 0, 6, [1.6, 1.6, 1.4]);
@@ -1394,6 +1435,7 @@ async function boot() {
           fx.stars(sp.x, sp.y + 6, 8);
           pop(r, 'Perfect!', '#FFD060', true);
           trackNow('perfect', 1);
+          comboAdd(r, 2);
           if (save.n.perfect >= 25) award('perfect-hold');
           break;
         case 'spring':
@@ -1434,12 +1476,14 @@ async function boot() {
           if (save.n.held >= 10) award('hold-on');
           washedLast = false;
           trackNow('held', 1);
+          comboAdd(r, 1);
           break;
         case 'silk': {
           sfx('silk');
           tally.swings++;
           save.n.swings++;
           trackNow('swing', 1);
+          comboAdd(r, 1);
           const sn = curRun.level.snags[e.snag];
           if (sn) {
             fx.glint(sn.x, sn.y, 0, 12);
@@ -1457,12 +1501,14 @@ async function boot() {
         case 'snap':
           sfx('snap');
           pop(r, 'Snap!', '#FF9A7A');
+          comboBreak(r);
           break;
         case 'scrabble':
           sfx('scrabble');
           fx.puff(sp.x, sp.y, 2);
           break;
         case 'washed':
+          comboBreak(r);
           sfx('washed');
           juice.add(0.45);
           juice.hit(0.07);
@@ -1486,6 +1532,7 @@ async function boot() {
           sfx('shrug');
           break;
         case 'knocked':
+          comboBreak(r);
           if (e.kind === 'bump') sfx('bump');
           juice.add(0.35);
           safe(() => navigator.vibrate?.(30));
@@ -1780,7 +1827,7 @@ async function boot() {
     const real = nowMs / 1000;
     const dt = Math.min(0.1, Math.max(0, real - lastReal));
     lastReal = real;
-    if (document.hidden || shot?.done) return;
+    if (document.hidden || shot?.done || shot?.manual) return;
     try {
       step(dt, real);
       render(dt, real);
@@ -1832,6 +1879,10 @@ async function boot() {
       playHints(curRun.me, dt);
     }
     if (curRun) otherEvents(curRun);
+    if (combo.left > 0 && isPlaying() && !curRun?.me?.sp?.holding) {
+      combo.left -= simDt;
+      if (combo.left <= 0) combo.n = 0;
+    }
     if (secsShown.length) {
       const v = String(Math.max(0, Math.ceil(match?.secondsLeft ?? 0)));
       for (const el of secsShown) if (el.textContent !== v) el.textContent = v;
@@ -1955,6 +2006,8 @@ async function boot() {
         else fr.st = { ...fr.st, m: wardrobeSlot === 'dance' ? 'done' : 'surf' };
       }
     }
+    if (shot?.only) for (const fr of frameRacers) if (fr.id !== shot.only) fr.hidden = true;
+    if (shot?.pose) for (const fr of frameRacers) if (fr.id === shot.only) fr.st = { ...fr.st, m: shot.pose };
     ghostOn = false;
     if (solo?.ghost && (flow === 'solo' || flow === 'solo-done') && ghostAt(solo.ghost, run.t, ghostState)) {
       const st = ghostRacer.st;
@@ -1976,6 +2029,7 @@ async function boot() {
       cam,
       weather: { gloom, drizzle: warnK, sunny: sunny ? 1 : 0 },
       snap: !!shot,
+      noDraw: !!shot?.noDraw,
       racers: frameRacers,
       ate: run.me?.ate ?? null,
       flood: run.mon ? run.mon.flood : null,
@@ -2086,7 +2140,7 @@ async function boot() {
     silkTarget = null;
     if (me && me.sp && !(match?.spectating && run.kind === 'race') && flow !== 'solo-done' && flow !== 'monsoon-done') {
       const p = proj(meDraw.x, meDraw.y);
-      hs.me = { sx: p.x, sy: p.y, grip: me.sp.grip / GRIP_MAX };
+      hs.me = { sx: p.x, sy: p.y, grip: me.sp.grip / GRIP_MAX, combo: combo.n >= 2 ? combo.n : 0, comboK: combo.left / COMBO_T };
       if (!me.finish && rinfo.warn && !rinfo.wet && rinfo.next < 1.4 && !inPocket(run.level, me.sp.x, me.sp.y) && isPlaying()) hs.ring = { sx: p.x, sy: p.y, next: rinfo.next, kind: rinfo.kind, holding: me.sp.holding };
       if (me.sp.mode === 'air' && isPlaying()) {
         aim.x = (input.has('right') ? 1 : 0) - (input.has('left') ? 1 : 0);
@@ -2321,7 +2375,7 @@ async function boot() {
     action: { spout: 1, seed: 4, t: 8.98, n: 5, gloom: 0.55, looks: { b0: 'coral', b1: 'gold', b2: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: 80, y: 2190, viewH: 190, lean: 70, rise: 40 } },
     win: { spout: 1, seed: 4, t: 15.6, n: 5, live: 1.6, burst: 0.4, sunny: true, payoff: { sun: [0.22, 0.3, -0.93], rb: [-0.25, -0.36, -0.9] }, looks: { b0: 'coral', b1: 'gold', b2: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: 112, y: 3165, viewH: 330, lean: -50, rise: -40 } },
     multi: { spout: 6, seed: 10, t: 4.48, n: 5, looks: { b0: 'coral', b1: 'gold', b2: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: 105, y: 1220, viewH: 380, lean: 30, rise: 70 } },
-    icon: { spout: 1, seed: 4, t: 15.6, n: 5, live: 1.6, sunny: true, looks: { b0: 'hero', b1: 'gold', b2: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: 262, y: 3095, viewH: 80, pos: [250, 3105, 110], look: [262, 3088, 0], fov: 40 } },
+    icon: { spout: 1, seed: 4, t: 15.6, n: 5, live: 1.6, only: 'b0', portrait: ['#f2fbff', '#7fd0ff', '#1b4fae'], looks: { b0: 'hero', b1: 'gold', b2: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: 258, y: 3081, viewH: 80, pos: [160, 3112, 30], look: [258, 3081, 0], fov: 39 } },
   };
 
   async function storeShot(name) {
@@ -2343,35 +2397,51 @@ async function boot() {
     while (advance(run, Math.min(t0, run.t + 1), null) > 0);
     for (const r of run.racers) if (r.sp) r.sp.events.length = 0;
     useRun(run);
+    // this spout's walls and ground load now; the picture waits for them
+    await texturesReady(8000);
     flow = 'shot';
-    shot = { t: S.t, frozen: false, done: false, sunny: !!S.sunny, gloom: S.gloom };
+    shot = { t: S.t, frozen: false, done: false, sunny: !!S.sunny, gloom: S.gloom, only: S.only, pose: params.get('pose') ?? S.pose };
     posterCam = { x: S.cam.x, y: S.cam.y, viewH: S.cam.viewH, lean: S.cam.lean ?? 0, rise: S.cam.rise ?? 95, fov: S.cam.fov, pos: S.cam.pos, look: S.cam.look };
     const posQ = params.get('pos')?.split(',').map(Number);
     if (posQ?.length === 7 && posQ.every(Number.isFinite)) Object.assign(posterCam, { pos: posQ.slice(0, 3), look: posQ.slice(3, 6), fov: posQ[6], x: posQ[3], y: posQ[4] });
     camSnap = true;
     if (S.payoff) view.setPayoff(S.payoff.sun, S.payoff.rb);
+    if (S.portrait) view.portrait(S.portrait);
     if (S.sign) {
       const sign = h('div', { class: 'sign poster-sign' }, h('span', { class: 'l1', text: 'Itsy Bitsy' }), h('span', { class: 'l2', text: 'Spider' }));
       document.body.append(sign);
     }
-    const t1 = performance.now();
+    // the last moments play at a fixed 60 frames a second without drawing (the picture is the same on a slow machine
+    // or a software renderer), then one frame is drawn
+    shot.manual = true;
+    shot.noDraw = true;
+    const dt = 1 / 60;
+    let real = 0;
     let burst = !S.burst;
-    while (!shot.frozen && performance.now() - t1 < 8000) {
+    for (let i = 0; i < 600 && !shot.frozen; i++) {
       if (!burst && run.t >= S.t - S.burst) {
         // the moment's own confetti, from everyone up top
         burst = true;
         for (const r of run.racers) if (r.finish) confettiAt(r, 44);
       }
-      await new Promise((r) => setTimeout(r, 16));
+      step(dt, real);
+      render(dt, real);
+      real += dt;
     }
-    for (let i = 0; i < 4; i++) await new Promise((r) => requestAnimationFrame(r));
+    for (let i = 0; i < 3; i++) {
+      step(dt, real);
+      render(dt, real);
+      real += dt;
+    }
+    shot.noDraw = false;
+    render(dt, real);
+    for (let i = 0; i < 2; i++) await new Promise((r) => requestAnimationFrame(r));
     shot.done = true;
     await fontsReady;
     document.body.dataset.ready = '1';
   }
 
   // ------------------------------------------------------------ go
-
   await fontsReady;
   await texturesReady(6000);
   requestAnimationFrame(frame);

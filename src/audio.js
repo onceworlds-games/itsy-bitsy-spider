@@ -257,6 +257,18 @@ export function sfx(name, arg = 0) {
       tone('sine', 220, 140, 0.06, 0.25);
       tone('triangle', 900 + Math.min(8, arg) * 90, 1500 + Math.min(8, arg) * 90, 0.09, 0.09, t + 0.04);
       break;
+    case 'combo': {
+      // a bright pip that climbs a scale as the combo grows
+      const SC = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+      const f = 660 * 2 ** (SC[Math.min(SC.length - 1, Math.max(0, arg - 2))] / 12);
+      tone('triangle', f, f * 1.01, 0.12, 0.07, t + 0.05);
+      if (arg >= 10) tone('sine', f * 2, f * 2, 0.18, 0.04, t + 0.08);
+      break;
+    }
+    case 'comboLost':
+      tone('triangle', 520, 260, 0.22, 0.08);
+      tone('triangle', 390, 196, 0.26, 0.06, t + 0.07);
+      break;
     case 'gold':
       [783.99, 987.77, 1174.66, 1567.98, 1975.53].forEach((f, i) => tone('triangle', f, f, 0.5, 0.08, t + i * 0.06));
       metal(2349, 0.9, 0.06, t + 0.3);

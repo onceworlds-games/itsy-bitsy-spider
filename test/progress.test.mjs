@@ -20,6 +20,9 @@ import {
   HAT_LIST,
   SILK,
   MAX_LEVEL,
+  weekOf,
+  weekGoalFor,
+  WEEK_KINDS,
 } from '../src/progress.js';
 
 test('levels: each costs more than the last, and every level up to 31 unlocks something', () => {
@@ -146,4 +149,41 @@ test('tracking finishes goals, opens the chest once, and keeps the streak', () =
   assert.equal(prevDay('2026-03-01'), '2026-02-28');
   assert.ok(chestSilk(8) > chestSilk(1));
   assert.equal(chestSilk(20), chestSilk(8));
+});
+
+test('the best combo of a climb pays silk from ×3, capped', () => {
+  assert.equal(climbReward({ kind: 'solo', spout: 1, finished: true, combo: 2 }).total, SILK.top + SILK.perSpout);
+  const r = climbReward({ kind: 'solo', spout: 1, finished: true, combo: 7 });
+  assert.equal(r.total, SILK.top + SILK.perSpout + 7 * SILK.combo);
+  assert.ok(r.lines.some((l) => l.label === 'Best combo ×7'));
+  assert.equal(climbReward({ kind: 'monsoon', metres: 0, combo: 500 }).total, SILK.comboCap);
+});
+
+test('the goal of the week: Monday to Sunday, the same for everyone, paid once', () => {
+  assert.equal(weekOf('2026-11-02'), '2026-11-02'); // a Monday
+  assert.equal(weekOf('2026-11-08'), '2026-11-02'); // that Sunday
+  assert.equal(weekOf('2026-11-09'), '2026-11-09');
+  assert.equal(weekOf('2026-03-01'), '2026-02-23');
+  const g = weekGoalFor('2026-11-02');
+  assert.deepEqual(g, weekGoalFor('2026-11-02'));
+  assert.ok(WEEK_KINDS[g.kind]);
+  const s = freshSave();
+  rollDay(s, '2026-11-03');
+  assert.equal(s.week.key, '2026-11-02');
+  s.week.goal = { kind: 'flies', n: 10, have: 0, done: false };
+  s.day.goals = [];
+  let r = track(s, 'flies', 6, '2026-11-03');
+  assert.equal(r.week, null);
+  r = track(s, 'flies', 6, '2026-11-04');
+  assert.ok(r.week);
+  assert.equal(r.silk, SILK.week);
+  r = track(s, 'flies', 6, '2026-11-05');
+  assert.equal(r.week, null, 'paid once');
+  // a save carries it, junk is dropped
+  assert.deepEqual(cleanSave(JSON.parse(JSON.stringify(s))).week, s.week);
+  assert.equal(cleanSave({ week: { key: 'x', goal: { kind: 'evil', n: 3 } } }).week.goal, null);
+  // the next Monday brings a new one
+  rollDay(s, '2026-11-09');
+  assert.equal(s.week.key, '2026-11-09');
+  assert.equal(s.week.goal.done, false);
 });

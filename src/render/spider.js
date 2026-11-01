@@ -5,6 +5,7 @@
 // Looks (species, colour, pattern, hat) come from the wardrobe.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { canvasTex } from './tex.js';
 import { R } from '../sim/config.js';
 
@@ -48,10 +49,43 @@ const tmp = {
   y: new THREE.Vector3(0, 1, 0),
 };
 
+// One leg segment, unit length along y and unit radius: swollen near the body end, tapering to the joint, with a pale
+// band before the joint and a few dark spines raked towards the tip (vertex colours times the segment's colour).
 const legGeo = (() => {
-  const g = new THREE.CylinderGeometry(0.7, 1, 1, 10, 1);
-  g.translate(0, 0.5, 0);
-  return g;
+  const prof = [];
+  const R = (y) => (y < 0.25 ? 0.94 + 0.14 * Math.sin((y / 0.25) * Math.PI * 0.5) : 1.08 - 0.42 * ((y - 0.25) / 0.75) ** 1.2);
+  prof.push(new THREE.Vector2(0.001, 0));
+  for (let i = 0; i <= 12; i++) {
+    const y = i / 12;
+    prof.push(new THREE.Vector2(R(y), y));
+  }
+  prof.push(new THREE.Vector2(0.001, 1));
+  const lathe = new THREE.LatheGeometry(prof, 10);
+  const n = lathe.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const y = lathe.attributes.position.getY(i);
+    const band = y > 0.8 && y < 0.93 ? 1.5 : y >= 0.93 ? 0.8 : 1 - 0.12 * (1 - y);
+    col.fill(band, i * 3, i * 3 + 3);
+  }
+  lathe.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const parts = [lathe.toNonIndexed()];
+  // spines
+  for (let k = 0; k < 7; k++) {
+    const y = 0.18 + (k / 7) * 0.6;
+    const a = k * 2.39996;
+    const cone = new THREE.ConeGeometry(0.085, 0.8, 4, 1);
+    cone.translate(0, 0.4, 0);
+    cone.rotateZ(-1.05); // out, raked forward along the leg
+    cone.rotateY(a);
+    cone.translate(Math.cos(a) * R(y) * 0.85, y, -Math.sin(a) * R(y) * 0.85);
+    const c = cone.toNonIndexed();
+    c.deleteAttribute('uv');
+    c.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(c.attributes.position.count * 2), 2));
+    c.setAttribute('color', new THREE.BufferAttribute(new Float32Array(c.attributes.position.count * 3).fill(0.45), 3));
+    parts.push(c);
+  }
+  return mergeGeometries(parts);
 })();
 const jointGeo = new THREE.SphereGeometry(1, 8, 6);
 
@@ -449,7 +483,9 @@ export function createSpider(look, opts = {}) {
       });
     }
   }
-  const segs = new THREE.InstancedMesh(legGeo, legMat, legs.length * 3);
+  const segMat = legMat.clone();
+  segMat.vertexColors = true;
+  const segs = new THREE.InstancedMesh(legGeo, segMat, legs.length * 3);
   const joints = new THREE.InstancedMesh(jointGeo, legMat, legs.length * 2);
   segs.frustumCulled = false;
   joints.frustumCulled = false;
