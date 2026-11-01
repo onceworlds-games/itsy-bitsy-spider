@@ -79,7 +79,7 @@ export function createView(host, opts = {}) {
     }
     return rig;
   }
-  const lookKey = (r) => `${r.look.color}|${r.look.mark}|${r.look.species ?? ''}|${r.look.hat ?? ''}|${r.ghost ? 1 : 0}`;
+  const lookKey = (r) => `${r.look.color}|${r.look.mark}|${r.look.species ?? ''}|${r.look.hat ?? ''}|${r.look.dance ?? ''}|${r.ghost ? 1 : 0}`;
 
   function wallXAt(side, y) {
     const pts = side === 'L' ? cur.run.level.left : cur.run.level.right;
@@ -144,7 +144,7 @@ export function createView(host, opts = {}) {
     const cx = c.x + juice.sx * (viewH / 700);
     const cy = c.y + juice.sy * (viewH / 700);
     const yawX = 70 + (c.lean ?? 0);
-    camera.position.set(cx + yawX, cy + 95, dist);
+    camera.position.set(cx + yawX, cy + (c.rise ?? 95), dist);
     camera.lookAt(cx, cy, 0);
     camera.rotateZ(juice.rot);
     camera.far = dist + 40000;

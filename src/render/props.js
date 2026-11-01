@@ -90,7 +90,7 @@ function grass(rnd, ZW, lo, hi, theme) {
   }
   blade.computeVertexNormals();
   const mat = windMaterial(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, side: THREE.DoubleSide }), 1.4);
-  const n = 2600;
+  const n = 1800;
   const im = new THREE.InstancedMesh(blade, mat, n);
   const m4 = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -100,10 +100,12 @@ function grass(rnd, ZW, lo, hi, theme) {
   let k = 0;
   while (k < n) {
     const x = (rnd() - 0.5) * 5200;
-    const z = ZW + 10 + Math.pow(rnd(), 1.6) * 1500;
+    // a strip along the foot of the wall: anything nearer the camera would stand in front of the climb
+    const z = ZW + 10 + Math.pow(rnd(), 1.4) * 300;
     // keep the drain and the pipe's foot clear
-    if (x > lo - 60 && x < hi + 60 && z < D2 + 120) continue;
-    const h = 40 + rnd() * 90 * (z < ZW + 300 ? 1.3 : 1);
+    if (x > lo - 80 && x < hi + 80) continue;
+    const near = Math.min(1, Math.max(0, (Math.abs(x - (lo + hi) / 2) - (hi - lo) / 2) / 400));
+    const h = (30 + rnd() * 80) * (0.55 + 0.45 * near);
     e.set((rnd() - 0.5) * 0.5, rnd() * Math.PI, (rnd() - 0.5) * 0.5);
     q.setFromEuler(e);
     m4.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(5 + rnd() * 5, h, 5));

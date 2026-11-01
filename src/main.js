@@ -409,7 +409,7 @@ async function boot() {
     const list = [];
     const players = room ? [...room.players.values()].filter((p) => p.connected !== false) : [];
     players.sort((a, b) => (a.id === room.me.id ? -1 : b.id === room.me.id ? 1 : 0));
-    players.slice(0, 6).forEach((p, i) => list.push({ id: p.id, name: p.name ?? 'Player', me: p.id === room.me.id, index: i, ready: !!p.ready || p.id === room.host }));
+    players.slice(0, 6).forEach((p, i) => list.push({ id: p.id, name: p.name ?? 'Player', me: p.id === room.me.id, index: i, ready: !!p.ready || p.id === room.host, dance: !!p.ready }));
     const fillBots = (room?.settings?.bots ?? 'fill') !== 'off';
     const humans = list.length;
     for (let i = humans; i < 6 && fillBots; i++) list.push({ id: `pv${i}`, name: BOT_NAMES[i - humans], bot: true, index: i, skill: 0.5 });
@@ -426,10 +426,14 @@ async function boot() {
       lobbyKey = key;
       lobbyRun = createRun({ kind: 'lobby', spout: cup.spouts[0], seed: 1, seats: seats.map((s) => ({ ...s, me: false, bot: false })) });
       lobbyRun.seatsInfo = seats;
+      const mid = centerXAt(lobbyRun.level, 0);
       for (const r of lobbyRun.racers) {
         const info = seats.find((s) => s.id === r.id);
         r.isMe = !!info?.me;
         r.look = info?.me ? { ...myLook() } : info?.bot ? botLook(r.name) : SEAT_LOOKS[r.index % SEAT_LOOKS.length];
+        // two rows on the drain, everyone turned to the middle
+        r.st.z = r.index % 2 ? -26 : 20;
+        r.st.f = r.st.x < mid ? 1 : -1;
       }
       useRun(lobbyRun);
     } else lobbyRun.seatsInfo = seats;
@@ -462,7 +466,7 @@ async function boot() {
       const cupTag = tag(h('span', { class: 'stack' }, cupName, cupSub), { silk: 30, cls: 'cup' });
       const bots = tag(botsText, { small: true, silk: 54, onclick: toggleBots, cls: 'bots' });
       const totalStars = SPOUTS.reduce((a, s) => a + (save.spouts[s.id]?.stars ?? 0), 0);
-      const monLabel = save.mon.best > 0 ? `Monsoon · ${Math.floor(save.mon.best)} m` : 'Monsoon';
+      const monFace = h('span', { class: 'stack' }, h('span', { text: 'Monsoon' }), h('span', { class: 'sub', text: save.mon.best > 0 ? `Best ${Math.floor(save.mon.best)} m` : 'Today\'s flood' }));
       const invite = tag('+ Invite', { small: true, silk: 20, onclick: () => safe(() => ow.ui.showInvite()), cls: 'invite' });
       const lv = P.levelOf(save.silk);
       el.append(
@@ -472,8 +476,8 @@ async function boot() {
         h(
           'div',
           { class: 'solorow' },
-          tag(h('span', { class: 'withstar' }, 'Spouts', h('span', { class: 'star on' }), `${totalStars}/${SPOUTS.length * 3}`), { silk: 34, onclick: showSpouts, cls: 'spouts', label: `Spouts, ${totalStars} stars` }),
-          tag(monLabel, { silk: 46, onclick: startMonsoon, cls: 'monsoon' }),
+          tag(h('span', { class: 'stack' }, h('span', { text: 'Spouts' }), h('span', { class: 'sub withstar' }, h('span', { class: 'star on' }), `${totalStars}/${SPOUTS.length * 3}`)), { silk: 34, onclick: showSpouts, cls: 'spouts', label: `Spouts, ${totalStars} stars` }),
+          tag(monFace, { silk: 46, onclick: startMonsoon, cls: 'monsoon' }),
         ),
         h('div', { class: 'community', hidden: true }),
       );
@@ -1580,7 +1584,7 @@ async function boot() {
   // ------------------------------------------------------------ the camera
 
   let camSnap = true;
-  const cam = { x: 0, y: 0, viewH: 420, lean: 0 };
+  const cam = { x: 0, y: 0, viewH: 420, lean: 0, rise: 95 };
   let W = 0;
   let HGT = 0;
 
@@ -1608,20 +1612,27 @@ async function boot() {
     let ty = cam.y;
     let tx = null;
     let lean = 0;
+    let rise = 95;
     if (flow === 'title' && attract) {
       let best = null;
       for (const r of attract.racers) if (!best || r.st.y > best.st.y) best = r;
       ty = (best?.st.y ?? 0) + vh * lead;
       viewH = vh * 1.1;
     } else if (flow === 'lobby' || flow === 'spouts') {
-      viewH = vh * 0.85;
-      ty = viewH * 0.3;
+      // the spiders on the drain, big: the pipe's width across a tall screen, close on a wide one
+      viewH = W > HGT ? 250 : (PIPE_W + 50) / Math.max(0.3, W / HGT);
+      ty = W > HGT ? viewH * 0.2 : -viewH * 0.1;
+      tx = centerXAt(curRun.level, 0);
     } else if (flow === 'wardrobe') {
+      // your spider alone, close, left of the panel (above it on a tall screen)
       const me = curRun.racers.find((r) => r.isMe) ?? curRun.racers[0];
-      viewH = 110;
-      ty = (me?.st.y ?? 0) + 14;
-      tx = (me?.st.x ?? 0) + (W > HGT ? 34 : 0);
-      lean = -30;
+      const wide = W / HGT >= 1.2;
+      viewH = wide ? 92 : 92 / Math.max(0.45, W / HGT) * 0.6;
+      const across = viewH * (W / HGT);
+      ty = (me?.st.y ?? 0) + (wide ? 4 : -viewH * 0.14);
+      tx = (me?.st.x ?? 0) - (me?.st.f ?? 1) * 5 + (wide ? across * 0.22 : 0);
+      lean = -18;
+      rise = 26;
     } else if ((chase = chaseAfterFinish())) {
       ty = chase.st.y + vh * lead;
     } else if (curRun.me && !(flow === 'race' && match?.spectating)) {
@@ -1662,7 +1673,8 @@ async function boot() {
     }
     const lo = viewH * 0.3 - 60;
     const hi = H + 560 - viewH * 0.5;
-    return { y: clamp(ty, Math.min(lo, hi), Math.max(lo, hi)), x: tx, viewH, lean };
+    const free = flow === 'wardrobe' || flow === 'lobby' || flow === 'spouts';
+    return { y: free ? ty : clamp(ty, Math.min(lo, hi), Math.max(lo, hi)), x: tx, viewH, lean, rise };
   }
   let lookY = 0;
 
@@ -1849,6 +1861,7 @@ async function boot() {
     const cxT = ct.x ?? centerXAt(run.level, cam.y);
     cam.x = snap ? cxT : cam.x + (cxT - cam.x) * (1 - Math.exp(-dt * 4));
     cam.lean += (ct.lean - cam.lean) * (1 - Math.exp(-dt * 2.5));
+    cam.rise = snap ? ct.rise : cam.rise + (ct.rise - cam.rise) * (1 - Math.exp(-dt * 4));
     view0.y0 = cam.y - cam.viewH * 0.6;
     view0.y1 = cam.y + cam.viewH * 0.6;
 
@@ -1870,10 +1883,19 @@ async function boot() {
 
     transitions(run);
     for (const fr of frameRacers) if (fr.id === run.me?.id) fr.wet = !!rinfo.wet;
+    if (flow === 'lobby' && run.seatsInfo) {
+      // a player who's ready dances
+      for (const fr of frameRacers) {
+        const info = run.seatsInfo.find((x) => x.id === fr.id);
+        if (info?.dance) fr.st = { ...fr.st, m: 'done' };
+      }
+    }
     if (flow === 'wardrobe') {
-      const me = run.racers.find((r) => r.isMe);
-      const fr = me && frameRacers.find((x) => x.id === me.id);
-      if (fr) fr.st = { ...fr.st, m: wardrobeSlot === 'dance' ? 'done' : 'surf' };
+      for (const fr of frameRacers) {
+        const r = run.byId.get(fr.id);
+        if (!r?.isMe) fr.hidden = true;
+        else fr.st = { ...fr.st, m: wardrobeSlot === 'dance' ? 'done' : 'surf' };
+      }
     }
     ghostOn = false;
     if (solo?.ghost && (flow === 'solo' || flow === 'solo-done') && ghostAt(solo.ghost, run.t, ghostState)) {

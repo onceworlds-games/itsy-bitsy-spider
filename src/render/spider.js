@@ -260,6 +260,7 @@ function hairs(geo, scale, n, mat, color, seed) {
  */
 export function createSpider(look, opts = {}) {
   const sp = SPECIES[look.species] ?? SPECIES.jumper;
+  const danceKind = look.dance ?? 'wave';
   const root = new THREE.Group(); // world placement (contact frame)
   const body = new THREE.Group(); // body pose (bob, squash, pitch)
   root.add(body);
@@ -528,6 +529,8 @@ export function createSpider(look, opts = {}) {
       A.x = st.x;
       A.y = st.y;
       A.init = true;
+      // standing on a floor at rest: face the way it was told
+      if ((st.ny ?? 1) > 0.7 && st.f) A.fwd.set(st.f, 0, 0);
     }
     const vx = (st.x - A.x) / dt;
     const vy = (st.y - A.y) / dt;
@@ -624,8 +627,33 @@ export function createSpider(look, opts = {}) {
       tmp.q.setFromAxisAngle(tmp.e.set(1, 0, 0), A.spin * 0.6);
       qRoot.multiply(tmp.q);
     }
+    // the dances (a cosmetic): turns, hops and flips of the whole spider
+    let lift = 0;
+    if (mode === 'done') {
+      const d = A.dance;
+      if (danceKind === 'spin') {
+        tmp.q.setFromAxisAngle(tmp.e.set(0, 1, 0), d * 7);
+        qRoot.multiply(tmp.q);
+        lift = Math.abs(Math.sin(d * 7)) * 1.5;
+      } else if (danceKind === 'hop') {
+        lift = Math.abs(Math.sin(d * 6.5)) * 9;
+      } else if (danceKind === 'flip') {
+        const P = 1.7;
+        const u = (d % P) / P;
+        if (u < 0.4) {
+          const k = u / 0.4;
+          const e = k * k * (3 - 2 * k);
+          lift = Math.sin(k * Math.PI) * 16;
+          tmp.q.setFromAxisAngle(tmp.e.set(0, 0, 1), e * Math.PI * 2);
+          qRoot.multiply(tmp.q);
+        }
+      } else if (danceKind === 'drum') {
+        lift = Math.abs(Math.sin(d * 11)) * 1.2;
+      }
+    }
     root.quaternion.copy(qRoot);
-    root.position.set(onSurf ? contactX : st.x, onSurf ? contactY : st.y, 0);
+    root.position.set(onSurf ? contactX : st.x, onSurf ? contactY : st.y, st.z ?? 0);
+    if (lift) root.position.addScaledVector(A.up, lift);
     if (!onSurf) root.position.addScaledVector(A.up, -H0 * scale * 0.7);
 
     // ---- the body's pose in the root frame
@@ -636,8 +664,9 @@ export function createSpider(look, opts = {}) {
     const st2 = 1 + A.squash;
     body.scale.set(st2, 1 / Math.sqrt(Math.max(0.3, st2)), 1 / Math.sqrt(Math.max(0.3, st2)));
     body.rotation.set(0, 0, mode === 'air' ? 0.15 : 0);
-    abd.rotation.set(0, 0, 0.16 + A.abdA - A.crouch * 0.12 + (mode === 'done' ? 0.45 + Math.sin(A.dance * 9) * 0.12 : 0));
-    abd.rotation.x = mode === 'done' ? Math.sin(A.dance * 6) * 0.35 : 0;
+    const waving = mode === 'done' && (danceKind === 'wave' || danceKind === 'drum');
+    abd.rotation.set(0, 0, 0.16 + A.abdA - A.crouch * 0.12 + (waving ? 0.45 + Math.sin(A.dance * 9) * 0.12 : mode === 'done' ? 0.2 : 0));
+    abd.rotation.x = waving ? Math.sin(A.dance * (danceKind === 'drum' ? 11 : 6)) * 0.35 : 0;
     if (fan) {
       const open = mode === 'done' ? 1 : 0;
       const fs = 0.2 + open * 0.8;
@@ -669,12 +698,29 @@ export function createSpider(look, opts = {}) {
         let fxo = L.rest.x * splay;
         let lift = 0;
         if (mode === 'done') {
-          // the dance: third legs up and waving, the rest planted wide
-          if (L.i === 2) {
-            fxo = 2;
-            lift = 13 + Math.sin(A.dance * 10 + (L.side > 0 ? 0 : 1.5)) * 4;
+          if (danceKind === 'wave') {
+            // third legs up and waving, the rest planted wide
+            if (L.i === 2) {
+              fxo = 2;
+              lift = 13 + Math.sin(A.dance * 10 + (L.side > 0 ? 0 : 1.5)) * 4;
+            }
+            if (L.i === 0 && sp.fan) lift = 4 + Math.sin(A.dance * 8) * 2;
+          } else if (danceKind === 'drum') {
+            // front legs drum on the ground, left and right in turn
+            if (L.i === 0) {
+              fxo += 3;
+              lift = Math.max(0, Math.sin(A.dance * 22 + (L.side > 0 ? 0 : Math.PI))) * 7;
+            }
+          } else if (danceKind === 'hop') {
+            // legs tuck at the top of each hop
+            const air = Math.abs(Math.sin(A.dance * 6.5));
+            lift = air * 3;
+            fxo *= 1 - air * 0.25;
+          } else if (danceKind === 'spin') {
+            if (L.i === 0) lift = 6;
+          } else if (danceKind === 'flip') {
+            if (L.i < 2) lift = 3 + Math.sin(A.dance * 9 + L.side) * 2;
           }
-          if (L.i === 0 && sp.fan) lift = 4 + Math.sin(A.dance * 8) * 2;
         } else if (A.speed > 4) {
           if (u < 0.5) fxo += STRIDE * (0.5 - u * 2);
           else {

@@ -277,33 +277,6 @@ button.tag[disabled] .face {
   margin-bottom: 18px;
 }
 
-.lobby {
-  justify-content: flex-start;
-}
-.cuprow {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-.cuprow .arrow .face {
-  font-family: var(--display);
-  font-weight: 400;
-  font-size: 26px;
-  min-width: 48px;
-  min-height: 48px;
-}
-.cup .face {
-  min-width: 190px;
-}
-.solorow {
-  margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 4px 12px;
-}
-
 .spouts {
   justify-content: flex-start;
 }
@@ -591,38 +564,6 @@ button.tag[disabled] .face {
   font-size: 34px;
 }
 
-/* The lobby on a landscape phone: the cup across the top, the buttons either side of the spout, the bench clear. */
-:where(.short) .lobby {
-  display: grid;
-  grid-template-columns: 1fr min(250px, 32%) 1fr;
-  grid-template-rows: auto 1fr auto auto;
-  align-items: start;
-  gap: 0 10px;
-}
-:where(.short) .lobby .cuprow {
-  grid-column: 1 / -1;
-  justify-self: center;
-}
-:where(.short) .lobby .botrow,
-:where(.short) .lobby .solorow {
-  display: contents;
-}
-:where(.short) .lobby .spouts {
-  grid-area: 3 / 1;
-  justify-self: end;
-}
-:where(.short) .lobby .monsoon {
-  grid-area: 4 / 1;
-  justify-self: end;
-}
-:where(.short) .lobby .bots {
-  grid-area: 3 / 3;
-  justify-self: start;
-}
-:where(.short) .lobby .invite {
-  grid-area: 4 / 3;
-  justify-self: start;
-}
 /* A race's places in two columns, and the cup's podium beside the rest of its table. */
 :where(.short) .roundend .places {
   margin-top: 0;
@@ -695,4 +636,636 @@ button.tag[disabled] .face {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* ------------------------------------------------------------ the lobby: the cup up top, your spider's level and
+   today's goals on one side, the solo climbs on the other, the spiders on the drain in the middle */
+
+.lobby {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto 1fr auto auto;
+  justify-items: center;
+  align-items: start;
+  gap: 0 12px;
+}
+.lobby .cuprow {
+  grid-row: 1;
+}
+.lobby .botrow {
+  grid-row: 2;
+  display: flex;
+  gap: 10px;
+}
+.lobby .side {
+  grid-row: 4;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.lobby .solorow {
+  grid-row: 5;
+}
+.lobby .community {
+  grid-row: 3;
+  align-self: end;
+}
+.cuprow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.cuprow .arrow .face {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 26px;
+  min-width: 48px;
+  min-height: 48px;
+}
+.cup .face {
+  min-width: 190px;
+}
+.solorow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 4px 12px;
+}
+.solorow .face {
+  min-width: 150px;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 22px;
+}
+.solorow .sub {
+  font-family: var(--text);
+  font-weight: 800;
+  font-size: 15px;
+}
+.monsoon .face {
+  background:
+    radial-gradient(circle at 8px 8px, #24465a 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 8px) 8px, #24465a 2px, transparent 2.5px),
+    radial-gradient(circle at 8px calc(100% - 8px), #24465a 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), #24465a 2px, transparent 2.5px),
+    linear-gradient(#a9e2f6, #5ea9c8);
+  border-color: #24465a;
+}
+.community {
+  font-size: 15px;
+  color: var(--bone);
+  text-shadow:
+    0 2px 0 var(--ink),
+    0 0 6px var(--ink);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.community[hidden] {
+  display: none;
+}
+
+/* Wide screens: the side panels flank the spout. */
+:where(.wide) .lobby {
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-rows: auto auto 1fr auto;
+}
+:where(.wide) .lobby .cuprow {
+  grid-area: 1 / 2;
+}
+:where(.wide) .lobby .botrow {
+  grid-area: 2 / 2;
+}
+:where(.wide) .lobby .side {
+  grid-area: 1 / 1 / 4 / 2;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-self: start;
+  margin-left: max(0px, calc(14% - 120px));
+}
+:where(.wide) .lobby .solorow {
+  grid-area: 1 / 3 / 4 / 4;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-self: end;
+  align-self: center;
+  margin-right: max(0px, calc(14% - 120px));
+}
+:where(.wide) .lobby .community {
+  grid-area: 4 / 1 / 5 / 2;
+  justify-self: start;
+  align-self: end;
+}
+
+/* Landscape phones: the same, tighter; bots and invite join the solo buttons on the right. */
+:where(.short.wide) .lobby .botrow {
+  grid-area: 1 / 3;
+  justify-self: end;
+}
+:where(.short.wide) .lobby .solorow {
+  grid-area: 2 / 3 / 4 / 4;
+  align-self: start;
+  gap: 0;
+}
+:where(.short) .goalcard {
+  min-width: 200px;
+  gap: 2px;
+}
+:where(.short) .goal,
+:where(.short) .chest {
+  font-size: 13px;
+}
+:where(.short) .goaltag {
+  --silk: 6px !important;
+}
+:where(.short) .goalcard .gh {
+  display: none;
+}
+:where(.short) .solorow .face {
+  min-width: 120px;
+  font-size: 18px;
+}
+
+/* ---- the level badge and its silk bar */
+
+.prof {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.lvl {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  background: var(--ink);
+  color: var(--gold);
+  font: 400 19px/1 var(--display);
+}
+.lvl.pop {
+  animation: pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.8) both;
+}
+.stack.left {
+  align-items: flex-start;
+}
+.pname {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 18px;
+}
+.bar {
+  position: relative;
+  display: block;
+  width: 120px;
+  height: 9px;
+  border-radius: 5px;
+  background: rgba(14, 20, 27, 0.45);
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+.bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 5px;
+  background: linear-gradient(#fff3c8, var(--gold));
+  transition: width 0.8s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+.prof .sub {
+  font-size: 14px;
+}
+.streak {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 15px 15px 15px 3px;
+  background: #e85d2c;
+  color: var(--bone);
+  font: 400 15px/1 var(--display);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* ---- today's goals */
+
+.goalcard {
+  align-items: stretch;
+  gap: 5px;
+  min-width: 230px;
+}
+.goalcard .gh,
+.board .gh {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 18px;
+  text-align: left;
+}
+.goals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.goal {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  font-size: 15px;
+  text-align: left;
+}
+.goal .gl {
+  grid-area: 1 / 1;
+}
+.goal .gn {
+  grid-area: 1 / 2;
+}
+.goal .bar {
+  grid-area: 2 / 1 / 3 / 3;
+  width: auto;
+  height: 6px;
+}
+.goal .gn {
+  font-size: 14px;
+  opacity: 0.8;
+}
+.goal.done .gl {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  opacity: 0.7;
+}
+.goal.done .gn {
+  color: #2d6a1f;
+  opacity: 1;
+}
+.goal.done .bar i {
+  background: linear-gradient(#c8f0a8, #5fae3a);
+}
+.chest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 15px;
+}
+.chest .box {
+  width: 22px;
+  height: 17px;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(#b87a3a 0 40%, #3a2410 40% 48%, #9a5e28 48%);
+  border: 2px solid var(--ink);
+  box-sizing: border-box;
+  flex: none;
+}
+.chest.open .box {
+  background: linear-gradient(#ffd27a 0 30%, #3a2410 30% 40%, #9a5e28 40%);
+}
+
+/* ---- the wardrobe: your spider on the left, the slots and items on the right (below it on a tall screen) */
+
+.wardrobe {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+}
+.wtop {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.wpanel {
+  grid-row: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+}
+.tabs,
+.items {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 8px;
+}
+.items {
+  max-height: 38vh;
+  overflow-y: auto;
+  padding: 0 6px 10px;
+  pointer-events: auto;
+  touch-action: pan-y;
+}
+.tab .face {
+  font-size: 16px;
+  padding: 4px 12px;
+  min-height: 36px;
+}
+.tab.on .face,
+.item.on .face {
+  background:
+    radial-gradient(circle at 8px 8px, #8a5a14 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 8px) 8px, #8a5a14 2px, transparent 2.5px),
+    linear-gradient(#ffd27a, #e8962e);
+  border-color: #8a5a14;
+}
+.item .face {
+  min-width: 92px;
+  padding: 6px 10px;
+}
+.item .iname {
+  font-size: 16px;
+}
+.item .need {
+  font-size: 13px;
+  opacity: 0.8;
+}
+.item.locked .face {
+  filter: saturate(0.3) brightness(0.72);
+}
+.swatch {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--c);
+  border: 2px solid var(--ink);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.2);
+}
+:where(.wide) .wardrobe {
+  grid-template-columns: 1fr minmax(320px, 46%);
+  grid-template-rows: auto 1fr;
+}
+:where(.wide) .wtop {
+  grid-area: 1 / 2;
+}
+:where(.wide) .wpanel {
+  grid-area: 2 / 2;
+  align-self: start;
+}
+:where(.wide) .items {
+  max-height: none;
+}
+:where(.short) .item .face {
+  min-width: 80px;
+  padding: 4px 8px;
+}
+
+/* ---- the spouts grid: flies and the golden fly */
+
+.fl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+}
+.flyi {
+  width: 12px;
+  height: 10px;
+  border-radius: 50% 50% 45% 45%;
+  background: radial-gradient(circle at 30% 30%, rgba(243, 237, 226, 0.9) 0 30%, transparent 32%), radial-gradient(circle at 70% 30%, rgba(243, 237, 226, 0.9) 0 30%, transparent 32%), var(--ink);
+}
+.gdot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(14, 20, 27, 0.25);
+  border: 1.5px solid var(--ink);
+  box-sizing: border-box;
+}
+.gdot.on {
+  background: var(--gold);
+}
+
+/* ---- after a climb: silk earned, line by line, into the level bar */
+
+.rewardtag .face {
+  padding: 10px 16px;
+}
+.reward {
+  align-items: stretch;
+  gap: 4px;
+  min-width: 220px;
+}
+.rlines {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rl {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  font-size: 16px;
+  opacity: 0;
+  animation: line-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  animation-delay: var(--d);
+}
+.rs {
+  font-family: var(--display);
+  font-weight: 400;
+  color: #5a3a08;
+}
+.rtotal {
+  display: flex;
+  justify-content: space-between;
+  border-top: 2px solid rgba(14, 20, 27, 0.35);
+  padding-top: 3px;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 20px;
+}
+.reward .prof {
+  margin-top: 4px;
+}
+.reward .bar {
+  width: 100%;
+  flex: 1;
+  height: 11px;
+}
+.reward .lvl {
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+}
+@keyframes line-in {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.cardrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.board {
+  align-items: stretch;
+  min-width: 190px;
+  gap: 2px;
+}
+.brow {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 8px;
+  font-size: 16px;
+  text-align: left;
+}
+.brow.mine {
+  color: #7a3a08;
+}
+.brow .bn {
+  font-family: var(--display);
+  font-weight: 400;
+}
+.brow .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+.silkline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font: 400 22px var(--display);
+  color: var(--gold);
+  text-shadow:
+    0 2px 0 var(--ink),
+    0 0 8px var(--ink);
+}
+.spool {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: repeating-linear-gradient(170deg, var(--bone) 0 2px, #cfc6b6 2px 4px);
+  border: 2px solid var(--ink);
+  box-sizing: border-box;
+}
+:where(.short) .cardrow,
+:where(.narrow) .cardrow {
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+/* ---- toasts: a goal done, a level, the chest. They hang in from the top and never move the page. */
+
+.toast {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--top, 78px) + 4px);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 200px;
+  padding: 8px 20px 10px;
+  border: 2px solid var(--rivet);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 8px 8px, var(--rivet) 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 8px) 8px, var(--rivet) 2px, transparent 2.5px),
+    linear-gradient(var(--zinc-a), var(--zinc-b));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    3px 6px 0 rgba(0, 0, 0, 0.35);
+  color: var(--ink);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: toast-in 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+.toast.out {
+  animation: toast-out 0.35s ease-in forwards;
+}
+.toast.level,
+.toast.chest {
+  background:
+    radial-gradient(circle at 8px 8px, #8a5a14 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 8px) 8px, #8a5a14 2px, transparent 2.5px),
+    linear-gradient(#ffd27a, #e8962e);
+  border-color: #8a5a14;
+}
+.toast .tt {
+  font: 400 21px/1.1 var(--display);
+}
+.toast .ts {
+  font-size: 15px;
+  opacity: 0.85;
+}
+@keyframes toast-in {
+  from {
+    transform: translate(-50%, -160%) rotate(-4deg);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes toast-out {
+  to {
+    transform: translate(-50%, -160%);
+    opacity: 0;
+  }
+}
+.reduced .toast,
+.reduced .rl {
+  animation: none;
+  opacity: 1;
+}
+
+/* Tall narrow screens: everything stacks under the spiders, which stand higher up the screen. */
+:where(.narrow) .lobby {
+  grid-template-rows: auto auto 1fr auto auto auto;
+}
+:where(.narrow) .lobby .side {
+  grid-row: 4 / 6;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+:where(.narrow) .lobby .solorow {
+  grid-row: 6;
+  flex-wrap: nowrap;
+}
+:where(.narrow) .solorow .face {
+  min-width: 0;
+  font-size: 19px;
+  padding: 8px 14px;
+}
+:where(.narrow) .goalcard {
+  min-width: min(300px, calc(100vw - 60px));
+}
+:where(.narrow) .goaltag {
+  --silk: 8px !important;
+}
+:where(.narrow) .wtop .profile {
+  display: none;
+}
+:where(.narrow) .tab .face {
+  font-size: 15px;
+  padding: 4px 9px;
+}
+:where(.narrow) .tabs {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 0 6px;
+}
+:where(.narrow) .tabs .tag {
+  margin-top: 6px;
+}
+:where(.narrow) .tabs .tag::before {
+  display: none;
+}
+:where(.narrow) .item .face {
+  min-width: 0;
+  width: 104px;
+}
+:where(.narrow) .cup .face {
+  min-width: 0;
 }
