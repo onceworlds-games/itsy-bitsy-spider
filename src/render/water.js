@@ -70,11 +70,11 @@ const frag = /* glsl */ `
       if (i >= uBandCount) break;
       vec4 b = uBands[i];
       // b.x: the front (lowest wet point), b.y: the tail (top of the water), b.z: how heavy
-      float edgeN = noise(vec2(vW.x * 0.05 + vW.z * 0.03, uTime * 3.0)) * 26.0;
+      float edgeN = noise(vec2(vW.x * 0.05 + vW.z * 0.03, uTime * 3.0)) * 26.0 + noise(vec2(vW.x * 0.23 + vW.z * 0.11, uTime * 9.0)) * 10.0;
       float inBand = smoothstep(b.x - 6.0 + edgeN, b.x + 18.0 + edgeN, y) * (1.0 - smoothstep(b.y - 80.0, b.y + 10.0, y));
       wet = max(wet, inBand);
       strength = max(strength, inBand * b.z);
-      foam = max(foam, exp(-max(0.0, y - b.x - edgeN) / 34.0) * step(b.x - 8.0 + edgeN, y) * step(y, b.y));
+      foam = max(foam, exp(-max(0.0, y - b.x - edgeN) / 34.0) * smoothstep(b.x - 12.0 + edgeN, b.x + 8.0 + edgeN, y) * step(y, b.y));
       // the film left above the tail, drying over about a second of fall
       film = max(film, (1.0 - smoothstep(0.0, 900.0, y - b.y)) * step(b.y, y) * 0.55);
     }
@@ -99,7 +99,7 @@ const frag = /* glsl */ `
       float line = 1.0 - smoothstep(0.0, 2.2, abs(fract(vW.x / 9.0) - 0.5) * 9.0);
       drip = has * line * smoothstep(0.55, 0.62, seg) * (1.0 - smoothstep(0.9, 1.0, seg)) * uDrizzle * (1.0 - dry);
     }
-    float a = max(max(wet * (0.64 + 0.26 * strength), film * 0.35), drip * 0.8);
+    float a = max(max(wet * (0.68 + 0.26 * strength), film * 0.35), drip * 0.8);
     // the film on the walls is thin and clear: a spider holding on under it still shows through
     if (vSide > 0.5) a *= 0.5;
     if (a < 0.003) discard;
@@ -115,8 +115,12 @@ const frag = /* glsl */ `
     vec3 h = normalize(uLight + v);
     float spec = pow(max(dot(n, h), 0.0), 60.0) * 3.0 + pow(max(dot(n, h), 0.0), 8.0) * 0.25;
     float fres = pow(1.0 - max(dot(n, v), 0.0), 3.0);
-    vec3 col = mix(uDeep, uSky, 0.25 + 0.5 * fres + 0.3 * streak);
-    col += uLightColor * spec;
+    vec3 col = mix(uDeep, uSky, 0.18 + 0.45 * fres + 0.35 * streak);
+    col *= 0.82 + 0.36 * n1;
+    // light caught on the ridges of the sheet: thin bright runs racing down with the water
+    vec2 suv = vec2(vW.x * 0.21 + vW.z * 0.13, (y + uTime * sp * 1.05) * 0.011);
+    float glint = smoothstep(0.7, 0.93, noise(suv)) * (0.5 + 0.5 * noise(suv * vec2(0.6, 2.7) + 11.0));
+    col += uLightColor * (spec + glint * 0.85 * wet);
     // the foam is churned: clumps and holes that tumble down with the water
     float fy = (y + uTime * sp * 0.92);
     float fn = noise(vec2(vW.x * 0.11 + vW.z * 0.05, fy * 0.06)) * 0.6 + noise(vec2(vW.x * 0.29, fy * 0.17) + 3.0) * 0.4;
@@ -128,7 +132,7 @@ const frag = /* glsl */ `
     // the film and drips are darker, glossy
     float wa = max(wet, foam);
     col = mix(uDeep * 0.6 + uLightColor * spec * 0.5, col, clamp(wa * 1.5, 0.0, 1.0));
-    gl_FragColor = vec4(col, a);
+    gl_FragColor = vec4(col, max(a, froth * 0.8));
     #include <colorspace_fragment>
   }`;
 
@@ -142,8 +146,8 @@ export function createWater(level, outline) {
     uDrizzle: { value: 0 },
     uLight: { value: new THREE.Vector3(-0.32, 0.78, 0.54).normalize() },
     uLightColor: { value: new THREE.Color(1.0, 0.95, 0.85) },
-    uDeep: { value: new THREE.Color(0.12, 0.32, 0.42) },
-    uSky: { value: new THREE.Color(0.55, 0.78, 0.92) },
+    uDeep: { value: new THREE.Color(0.06, 0.24, 0.34) },
+    uSky: { value: new THREE.Color(0.5, 0.76, 0.93) },
     uFlash: { value: 0 },
     uFlood: { value: -1e6 },
     uAmb: { value: 1 },

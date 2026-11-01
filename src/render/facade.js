@@ -762,17 +762,19 @@ function roof(level, theme, top) {
   const g = new THREE.Group();
   const H = level.H;
   const fasciaMat = plain(`fascia:${theme.fascia}`, { color: theme.fascia, roughness: 0.6 });
-  const fascia = new THREE.Mesh(new THREE.BoxGeometry(12000, 300, 36), fasciaMat);
-  fascia.position.set(0, H + 20, -D2 - WALL_T - 22);
+  // the eave sits low over the gutter: the roof starts just behind the spiders at the top
+  const EAVE = H + 80;
+  const fascia = new THREE.Mesh(new THREE.BoxGeometry(12000, EAVE - (H - 130), 36), fasciaMat);
+  fascia.position.set(0, (EAVE + H - 130) / 2, -D2 - WALL_T - 22);
   fascia.receiveShadow = true;
   g.add(fascia);
   // soffit under the eaves
   const soffit = new THREE.Mesh(new THREE.BoxGeometry(12000, 20, ZW * -1 - D2 - WALL_T + 40), fasciaMat);
   soffit.position.set(0, top, (ZW + (-D2 - WALL_T)) / 2);
   g.add(soffit);
-  const pitch = THREE.MathUtils.degToRad(theme.roof?.glass ? 26 : 38);
+  const pitch = THREE.MathUtils.degToRad(theme.roof?.glass ? 24 : 30);
   // a short pitch up to a ridge, so the sky and the sun are right there above the gutter when you reach the top
-  const len = 640;
+  const len = 500;
   const rt = theme.roof.tile;
   const tiles = pbr(theme.roof.id, { tile: rt, color: theme.roof.color, normal: 1.4, env: 0.3, key: `roof:${theme.key}` });
   const geo = new THREE.PlaneGeometry(12000, len);
@@ -781,22 +783,22 @@ function roof(level, theme, top) {
   geo.translate(0, len / 2, 0);
   const plane = new THREE.Mesh(geo, tiles);
   plane.rotation.x = -(Math.PI / 2 - pitch);
-  plane.position.set(0, H + 170, -D2 - WALL_T - 10);
+  plane.position.set(0, EAVE, -D2 - WALL_T - 10);
   plane.receiveShadow = true;
   plane.castShadow = true;
   g.add(plane);
   // the tiles' front edge: a thick lip
   const lip = new THREE.Mesh(new THREE.BoxGeometry(12000, 40, 90), tiles);
-  lip.position.set(0, H + 175, -D2 - WALL_T + 20);
+  lip.position.set(0, EAVE + 5, -D2 - WALL_T + 20);
   lip.castShadow = true;
   g.add(lip);
   // the ridge: a row of round capping tiles along the top, the far slope falling away behind it
-  const rx = H + 170 + Math.sin(pitch) * len;
+  const rx = EAVE + Math.sin(pitch) * len;
   const rz = -D2 - WALL_T - 10 - Math.cos(pitch) * len;
-  const capMat = plain(`ridge:${theme.key}`, { color: new THREE.Color(theme.roof.color).multiplyScalar(0.8), roughness: 0.75 });
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(34, 34, 12000, 14, 1, false, 0, Math.PI), capMat);
-  cap.rotation.z = Math.PI / 2; // along the ridge, round side up
-  cap.position.set(0, rx + 4, rz);
+  const capMat = plain(`ridge:${theme.key}`, { color: new THREE.Color(theme.roof.color).multiplyScalar(0.6), roughness: 0.8 });
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(26, 26, 12000, 16), capMat);
+  cap.rotation.z = Math.PI / 2; // along the ridge, sitting over the join of the two slopes
+  cap.position.set(0, rx - 4, rz);
   cap.castShadow = true;
   g.add(cap);
   const back = new THREE.Mesh(geo.clone(), tiles);

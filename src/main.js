@@ -5,7 +5,7 @@ import { createView, centerXAt } from './render/view.js';
 import { texturesReady } from './render/tex.js';
 import { createRun, advance, liveOrder } from './sim/run.js';
 import { SPOUTS, CUPS, spoutById, cupById, starsFor, STAR_TIMES } from './sim/spouts.js';
-import { SEAT_LOOKS, GRIP_MAX, M, CLOSE_AFTER, PIPE_W, STEP } from './sim/config.js';
+import { SEAT_LOOKS, GRIP_MAX, M, CLOSE_AFTER, PIPE_W, STEP, WALL_T, R } from './sim/config.js';
 import { rainAt, debrisComing } from './sim/weather.js';
 import { BOT_NAMES, createBrain, think } from './sim/bot.js';
 import { dayKey, daySeed } from './sim/monsoon.js';
@@ -1664,7 +1664,7 @@ async function boot() {
         viewH = vh * 1.5;
         const dist = viewH / 2 / Math.tan((15 * Math.PI) / 180);
         rise = -Math.tan((5 * Math.PI) / 180) * dist;
-        ty = H + 200 - rise;
+        ty = H + 100 - rise;
         topShot = true;
       }
       if (curRun.mon) ty = Math.max(ty, curRun.mon.flood + vh * 0.38);
@@ -1843,6 +1843,39 @@ async function boot() {
     while (pops.length && pops[0].age > pops[0].life) pops.shift();
   }
 
+  /**
+   * At the top a spider hops out of the pipe's mouth onto the gutter beside it and dances there, in the sun, in the
+   * order they arrived (first on the right of the mouth, second on the left, then further out).
+   */
+  const gutterSt = new Map();
+  function onTheGutter(run, r, st) {
+    const last = run.level.spans[run.level.spans.length - 1];
+    let slot = 0;
+    for (const o of run.racers) if (o !== r && o.finish && (o.finish < r.finish || (o.finish === r.finish && o.index < r.index))) slot++;
+    const side = slot % 2 ? -1 : 1;
+    const tx = last.cx + side * (last.half + WALL_T + 34 + Math.floor(slot / 2) * 44);
+    const ty = run.level.H + R;
+    let g = gutterSt.get(r.id);
+    if (!g || g.run !== run) gutterSt.set(r.id, (g = { run, x0: st.x, y0: st.y, st: { ...st } }));
+    const k = clamp((run.t - r.finish) / 0.55, 0, 1);
+    const o = g.st;
+    Object.assign(o, st);
+    if (k < 1) {
+      const e = k * k * (3 - 2 * k);
+      o.x = g.x0 + (tx - g.x0) * e;
+      o.y = g.y0 + (ty - g.y0) * e + Math.sin(k * Math.PI) * 46;
+      o.m = 'air';
+    } else {
+      o.x = tx;
+      o.y = ty;
+      o.nx = 0;
+      o.ny = 1;
+      o.f = -side;
+      o.m = 'done';
+    }
+    return o;
+  }
+
   /** The state the picture shows for a racer: between its last two steps when this page simulates it. */
   function drawState(run, r) {
     let d = drawStates.get(r.id);
@@ -1864,7 +1897,8 @@ async function boot() {
     // ---- who to draw (first: the camera follows the drawn spider, not the stepped one)
     frameRacers.length = 0;
     for (const r of run.racers) {
-      const st = drawState(run, r);
+      let st = drawState(run, r);
+      if (r.finish && st.m === 'done' && run.kind !== 'lobby' && run.kind !== 'attract') st = onTheGutter(run, r, st);
       frameRacers.push({ id: r.id, look: r.look, st, ghost: false, wet: false, hidden: r.left && !r.finish && run.kind === 'race' });
     }
     // ---- camera
@@ -1881,8 +1915,11 @@ async function boot() {
     }
     const cxT = ct.x ?? centerXAt(run.level, cam.y);
     cam.x = snap ? cxT : cam.x + (cxT - cam.x) * (1 - Math.exp(-dt * 4));
-    cam.lean += (ct.lean - cam.lean) * (1 - Math.exp(-dt * 2.5));
+    cam.lean = snap ? ct.lean : cam.lean + (ct.lean - cam.lean) * (1 - Math.exp(-dt * 2.5));
     cam.rise = snap ? ct.rise : cam.rise + (ct.rise - cam.rise) * (1 - Math.exp(-dt * 4));
+    cam.fov = ct.fov;
+    cam.pos = ct.pos;
+    cam.look = ct.look;
     view0.y0 = cam.y - cam.viewH * 0.6;
     view0.y1 = cam.y + cam.viewH * 0.6;
 
@@ -1896,7 +1933,7 @@ async function boot() {
     const quiet = run.kind === 'lobby' || flow === 'wardrobe' || flow === 'spouts';
     const calmTarget = quiet ? 0.7 : sunny ? 1 : rinfo.wet || rinfo.warn ? 0 : clamp((rinfo.next - 1.5) / 2, 0, 1);
     calm += (calmTarget - calm) * (shot ? 1 : 1 - Math.exp(-dt * 2));
-    const gloomTarget = quiet || sunny ? 0 : rinfo.wet ? 1 : warnK;
+    const gloomTarget = shot?.gloom ?? (quiet || sunny ? 0 : rinfo.wet ? 1 : warnK);
     gloom += (gloomTarget - gloom) * (shot ? 1 : 1 - Math.exp(-dt * 3));
     sunNow = sunny;
     weatherSounds(run, warnK, real, sunny);
@@ -2270,6 +2307,7 @@ async function boot() {
 
   const LOOKS = {
     coral: { species: 'jumper', color: '#FF6F59', mark: 'stripes', hat: 'none', trail: 'none', dance: 'hop' },
+    hero: { species: 'jumper', color: '#FF6F59', mark: 'stripes', hat: 'sou', trail: 'none', dance: 'wave' },
     gold: { species: 'peacock', color: '#FFB648', mark: 'chevron', hat: 'flower', trail: 'sparkle', dance: 'wave' },
     sky: { species: 'orb', color: '#5CC8FF', mark: 'dots', hat: 'beanie', trail: 'bubbles', dance: 'spin' },
     leaf: { species: 'longlegs', color: '#9BD35A', mark: 'ring', hat: 'acorn', trail: 'leaves', dance: 'drum' },
@@ -2279,8 +2317,11 @@ async function boot() {
   // Each picture: a race of bots on one spout, stopped at a moment found by simulating it (the sim is deterministic),
   // and a camera placed on it.
   const SHOTS = {
-    action: { spout: 3, seed: 11, t: 10.65, n: 5, looks: { b4: 'coral', b0: 'gold', b1: 'sky', b2: 'leaf', b3: 'violet' }, cam: { x: 50, y: 1640, viewH: 300, lean: 50, rise: 40 } },
-    cover: { spout: 8, seed: 10, t: 15.17, n: 5, sign: true, looks: { b2: 'coral', b0: 'gold', b1: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: -60, y: 2230, viewH: 420, lean: 20, rise: 80 } },
+    cover: { spout: 8, seed: 10, t: 15.17, n: 5, sign: true, looks: { b2: 'coral', b0: 'gold', b1: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: -20, y: 2190, viewH: 360, lean: 20, rise: 70 } },
+    action: { spout: 1, seed: 4, t: 8.98, n: 5, gloom: 0.55, looks: { b0: 'coral', b1: 'gold', b2: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: 80, y: 2190, viewH: 190, lean: 70, rise: 40 } },
+    win: { spout: 1, seed: 4, t: 15.6, n: 5, live: 1.6, burst: 0.4, sunny: true, payoff: { sun: [0.22, 0.3, -0.93], rb: [-0.25, -0.36, -0.9] }, looks: { b0: 'coral', b1: 'gold', b2: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: 112, y: 3165, viewH: 330, lean: -50, rise: -40 } },
+    multi: { spout: 6, seed: 10, t: 4.48, n: 5, looks: { b0: 'coral', b1: 'gold', b2: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: 105, y: 1220, viewH: 380, lean: 30, rise: 70 } },
+    icon: { spout: 1, seed: 4, t: 15.6, n: 5, live: 1.6, sunny: true, looks: { b0: 'hero', b1: 'gold', b2: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: 262, y: 3095, viewH: 80, pos: [250, 3105, 110], look: [262, 3088, 0], fov: 40 } },
   };
 
   async function storeShot(name) {
@@ -2303,15 +2344,26 @@ async function boot() {
     for (const r of run.racers) if (r.sp) r.sp.events.length = 0;
     useRun(run);
     flow = 'shot';
-    shot = { t: S.t, frozen: false, done: false, sunny: !!S.sunny };
-    posterCam = { x: S.cam.x, y: S.cam.y, viewH: S.cam.viewH, lean: S.cam.lean ?? 0, rise: S.cam.rise ?? 95 };
+    shot = { t: S.t, frozen: false, done: false, sunny: !!S.sunny, gloom: S.gloom };
+    posterCam = { x: S.cam.x, y: S.cam.y, viewH: S.cam.viewH, lean: S.cam.lean ?? 0, rise: S.cam.rise ?? 95, fov: S.cam.fov, pos: S.cam.pos, look: S.cam.look };
+    const posQ = params.get('pos')?.split(',').map(Number);
+    if (posQ?.length === 7 && posQ.every(Number.isFinite)) Object.assign(posterCam, { pos: posQ.slice(0, 3), look: posQ.slice(3, 6), fov: posQ[6], x: posQ[3], y: posQ[4] });
     camSnap = true;
+    if (S.payoff) view.setPayoff(S.payoff.sun, S.payoff.rb);
     if (S.sign) {
       const sign = h('div', { class: 'sign poster-sign' }, h('span', { class: 'l1', text: 'Itsy Bitsy' }), h('span', { class: 'l2', text: 'Spider' }));
       document.body.append(sign);
     }
     const t1 = performance.now();
-    while (!shot.frozen && performance.now() - t1 < 8000) await new Promise((r) => setTimeout(r, 30));
+    let burst = !S.burst;
+    while (!shot.frozen && performance.now() - t1 < 8000) {
+      if (!burst && run.t >= S.t - S.burst) {
+        // the moment's own confetti, from everyone up top
+        burst = true;
+        for (const r of run.racers) if (r.finish) confettiAt(r, 44);
+      }
+      await new Promise((r) => setTimeout(r, 16));
+    }
     for (let i = 0; i < 4; i++) await new Promise((r) => requestAnimationFrame(r));
     shot.done = true;
     await fontsReady;

@@ -46,7 +46,7 @@ export function createView(host, opts = {}) {
   let cur = null; // { run, world, water, flies, debris, birds, rigs: Map }
   const tmpV = new THREE.Vector3();
   const SKY_SUN = new THREE.Vector3(-0.45, 0.55, -0.7).normalize();
-  const PAYOFF_SUN = new THREE.Vector3(0.2, 0.28, -0.94).normalize();
+  const PAYOFF_SUN = new THREE.Vector3(0.2, 0.23, -0.95).normalize();
   const sunDir = new THREE.Vector3(-0.32, 0.78, 0.54).normalize();
   const mood = { calm: 1, gloom: 0, drizzle: 0, flash: 0, sunny: 0, storm: 0 };
   const camState = { x: 0, y: 0, viewH: 560, lean: 0 };
@@ -150,8 +150,16 @@ export function createView(host, opts = {}) {
     const cx = c.x + juice.sx * (viewH / 700);
     const cy = c.y + juice.sy * (viewH / 700);
     const yawX = 70 + (c.lean ?? 0);
-    camera.position.set(cx + yawX, cy + (c.rise ?? 95), dist);
-    camera.lookAt(cx, cy, 0);
+    const fov = c.fov ?? 30;
+    if (camera.fov !== fov) camera.fov = fov;
+    if (c.pos) {
+      // a placed camera (the store pictures): from here, looking there
+      camera.position.set(c.pos[0], c.pos[1], c.pos[2]);
+      camera.lookAt(c.look[0], c.look[1], c.look[2]);
+    } else {
+      camera.position.set(cx + yawX, cy + (c.rise ?? 95), dist);
+      camera.lookAt(cx, cy, 0);
+    }
     camera.rotateZ(juice.rot);
     camera.far = dist + 40000;
     camera.updateProjectionMatrix();
@@ -253,6 +261,11 @@ export function createView(host, opts = {}) {
     },
     resize(w, h, pr) {
       stage.resize(w, h, pr);
+    },
+    /** Where the sun comes out and the rainbow stands, for a staged picture. */
+    setPayoff(sun, rb) {
+      PAYOFF_SUN.set(sun[0], sun[1], sun[2]).normalize();
+      sky.uniforms.rbDir.value.set(rb[0], rb[1], rb[2]).normalize();
     },
     setQuality(q) {
       stage.setQuality(q);

@@ -628,7 +628,7 @@ function gutterMesh(level, theme) {
   // the floor (cut through at the pipe's mouth), its back wall rising, the rolled bead along the back top
   geo.box(cx - reach, H - 14, -D2 - WALL_T, cx - half - WALL_T, H, D2);
   geo.box(cx + half + WALL_T, H - 14, -D2 - WALL_T, cx + reach, H, D2);
-  geo.box(cx - reach, H - 14, -D2 - WALL_T, cx + reach, H + 120, -D2);
+  geo.box(cx - reach, H - 14, -D2 - WALL_T, cx + reach, H + 60, -D2);
   const m = new THREE.Mesh(geo.build(420), zinc);
   m.castShadow = true;
   m.receiveShadow = true;
@@ -639,7 +639,7 @@ function gutterMesh(level, theme) {
   g.add(new THREE.Mesh(lip.build(1), plain('zincEdge', {})));
   const bead = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, reach * 2, 12), beadMat);
   bead.rotation.z = Math.PI / 2;
-  bead.position.set(cx, H + 120, -D2 + 4);
+  bead.position.set(cx, H + 60, -D2 + 4);
   bead.castShadow = true;
   g.add(bead);
   // a few leaves and twigs in the gutter, a puddle
