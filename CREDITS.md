@@ -8,7 +8,7 @@ Everything here is free to use. Textures were downscaled and repacked (colour, n
 | --- | --- | --- | --- | --- |
 | Metal021 | zinc of the downpipe | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=Metal021 |
 | Metal062C | brass and lamp metal | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=Metal062C |
-| MetalPlates013 | iron brackets and straps | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=MetalPlates013 |
+| MetalPlates013 | iron brackets, straps and the drain grate | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=MetalPlates013 |
 | WoodSiding008 | plank walls | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=WoodSiding008 |
 | WoodSiding005 | barn siding | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=WoodSiding005 |
 | Plaster007 | render and plaster walls | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=Plaster007 |
@@ -20,7 +20,7 @@ Everything here is free to use. Textures were downscaled and repacked (colour, n
 | Bricks060 | brick wall | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=Bricks060 |
 | Bricks097 | brick wall | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=Bricks097 |
 | Bricks059 | brick wall | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=Bricks059 |
-| Concrete036 | sills and plinths | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=Concrete036 |
+| Concrete036 | sills, plinths and the drain's kerb | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=Concrete036 |
 | Grass007 | garden ground | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=Grass007 |
 | PavingStones138 | street paving | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=PavingStones138 |
 | RoofingTiles001 | roof tiles | ambientCG (Lennart Demes) | CC0 1.0 | https://ambientcg.com/view?id=RoofingTiles001 |
