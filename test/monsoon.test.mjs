@@ -20,6 +20,11 @@ test('Monsoon spouts are valid for many seeds: clean paths, pockets on the path,
     for (let i = 0; i < L.path.n - 1; i++) assert.ok(L.path.cum[i + 1] - L.path.cum[i] > 1e-3);
     for (const a of L.pocketAnchors) assert.ok(inPocket(L, a.x, a.y));
     for (const c of L.center) assert.ok(Math.abs(c[0]) <= 300, `pipe wandered to ${c[0]}`);
+    // Flies all the way up, a golden one every 50 m or so, twigs to land on, bolts to swing from.
+    const gold = L.flies.filter((f) => f.gold);
+    assert.ok(gold.length >= 15, `${gold.length} golden flies`);
+    for (let i = 1; i < gold.length; i++) assert.ok(gold[i].y - gold[i - 1].y < 6500);
+    assert.ok(L.flies.length > 200 && L.islands.length > 60 && L.snags.length > 20);
   }
 });
 

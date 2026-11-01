@@ -73,22 +73,47 @@ export function buildLevel(pieces, opts = {}) {
   const pocketAnchors = [];
   const probe = {};
   pockets.forEach((poly, k) => {
-    for (const path of paths) {
-      // Walk the path in short steps (a straight edge has no vertices in the middle to test).
+    const b = pocketBoxes[k];
+    // The path segments near this pocket (from the height buckets), by path, in order along each path.
+    const near = new Map();
+    const seen = new Set();
+    for (let q = Math.floor((b.y0 - 2) / BUCKET); q <= Math.floor((b.y1 + 2) / BUCKET); q++) {
+      for (const g of index.buckets.get(q) ?? []) {
+        if (seen.has(g)) continue;
+        seen.add(g);
+        const path = paths[index.segPath[g]];
+        const i = index.segIdx[g];
+        if (Math.max(path.x[i], path.x[i + 1]) < b.x0 - 1 || Math.min(path.x[i], path.x[i + 1]) > b.x1 + 1) continue;
+        let list = near.get(path.id);
+        if (!list) near.set(path.id, (list = []));
+        list.push(i);
+      }
+    }
+    for (const [pi, segs] of near) {
+      const path = paths[pi];
+      segs.sort((x, y) => x - y);
+      // Walk those segments in short steps (a straight edge has no vertices in the middle to test).
       let run = null;
-      const steps = Math.ceil(path.length / 4);
-      for (let i = 0; i <= steps + 1; i++) {
-        const s = Math.min(path.length, i * 4);
-        const inside = i <= steps && (sampleAt(path, s, probe), pointInPoly(poly, probe.x, probe.y));
-        if (inside && !run) run = { a: s, b: s };
-        else if (inside) run.b = s;
-        else if (run) {
-          const s = (run.a + run.b) / 2;
-          const p = sampleAt(path, s, {});
-          pocketAnchors.push({ k, pi: path.id, s, x: p.x, y: p.y, len: run.b - run.a });
-          run = null;
+      let lastSeg = -2;
+      const close = () => {
+        if (!run) return;
+        const s = (run.a + run.b) / 2;
+        const p = sampleAt(path, s, {});
+        pocketAnchors.push({ k, pi, s, x: p.x, y: p.y, len: run.b - run.a });
+        run = null;
+      };
+      for (const i of segs) {
+        if (i !== lastSeg + 1) close();
+        lastSeg = i;
+        for (let s = path.cum[i]; s < path.cum[i + 1]; s += 4) {
+          sampleAt(path, s, probe);
+          if (pointInPoly(poly, probe.x, probe.y)) {
+            if (!run) run = { a: s, b: s };
+            else run.b = s;
+          } else close();
         }
       }
+      close();
     }
   });
   snags.sort((a, b) => a.y - b.y);
