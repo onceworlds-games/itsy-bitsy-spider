@@ -1269,3 +1269,20 @@ button.tag[disabled] .face {
 :where(.narrow) .cup .face {
   min-width: 0;
 }
+
+/* store art: the name, big, hanging over the wall */
+.poster-sign {
+  position: fixed;
+  left: 64px;
+  top: 0;
+  --silk: 70px;
+  animation: none;
+  z-index: 3;
+  padding: 18px 44px 26px;
+}
+.poster-sign .l1 {
+  font-size: 64px;
+}
+.poster-sign .l2 {
+  font-size: 128px;
+}

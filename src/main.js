@@ -5,7 +5,7 @@ import { createView, centerXAt } from './render/view.js';
 import { texturesReady } from './render/tex.js';
 import { createRun, advance, liveOrder } from './sim/run.js';
 import { SPOUTS, CUPS, spoutById, cupById, starsFor, STAR_TIMES } from './sim/spouts.js';
-import { SEAT_LOOKS, GRIP_MAX, M, CLOSE_AFTER, PIPE_W } from './sim/config.js';
+import { SEAT_LOOKS, GRIP_MAX, M, CLOSE_AFTER, PIPE_W, STEP } from './sim/config.js';
 import { rainAt, debrisComing } from './sim/weather.js';
 import { BOT_NAMES, createBrain, think } from './sim/bot.js';
 import { dayKey, daySeed } from './sim/monsoon.js';
@@ -54,7 +54,9 @@ const fontsReady = Promise.all(
 // ?poster=<name>: store art (poster.js). ?poster=screen-<name>[.WxH]: one of the game's screens staged as in real play.
 const POSTER = params.get('poster') ?? '';
 const STAGE = /^screen-[a-z]+([.]\d{2,4}x\d{2,4})?$/.test(POSTER) ? POSTER : '';
-if (POSTER && !STAGE) import('./poster.js').then((m) => m.runPoster(POSTER));
+// the store pictures drawn by the 3D renderer (badges are drawn flat, in poster.js)
+const SHOT = ['cover', 'action', 'win', 'multi', 'icon'].includes(POSTER) ? POSTER : '';
+if (POSTER && !STAGE && !SHOT) import('./poster.js').then((m) => m.runPoster(POSTER));
 else
   boot().catch((err) => {
     console.error(err);
@@ -86,7 +88,7 @@ const TRAIL_RGB = {
 };
 
 async function boot() {
-  const ow = STAGE ? stubOw() : hasOw || stubOw();
+  const ow = STAGE || SHOT ? stubOw() : hasOw || stubOw();
   const stageBox = (() => {
     const m = /[.](\d+)x(\d+)$/.exec(STAGE);
     return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
@@ -115,7 +117,7 @@ async function boot() {
   const ui = createUI(uiRoot);
   const quality = () => safe(() => ow.settings.quality) ?? params.get('q') ?? 'high';
   const reduced = () => !!safe(() => ow.settings.reducedMotion);
-  const view = createView(document.getElementById('stage'), { quality: quality(), preserve: !!STAGE || params.has('shot') });
+  const view = createView(document.getElementById('stage'), { quality: quality(), preserve: !!STAGE || !!SHOT || params.has('shot') });
   if (params.has('debug')) window.__view = view;
   const juice = view.juice;
   const fx = view.fx;
@@ -296,6 +298,8 @@ async function boot() {
   let lobbyKey = '';
   let attract = null;
   let paused = false;
+  let shot = null; // store art: { t, frozen, done, sunny }
+  let posterCam = null;
   let solo = null; // { id, tutorial, ghost, doneAt }
   let mon = null; // { day, doneAt }
   let hint = { text: '', age: 0, life: 0, target: null, key: '' };
@@ -1593,8 +1597,9 @@ async function boot() {
   function baseViewH() {
     const aspect = W / Math.max(1, HGT);
     const across = PIPE_W + 2 * 18 + 160; // the pipe, its walls and some wall either side
-    return Math.max(420, across / Math.max(0.3, aspect));
+    return Math.max(370, across / Math.max(0.3, aspect));
   }
+  let zoomOut = 0;
 
   function chaseAfterFinish() {
     const me = curRun.me;
@@ -1605,6 +1610,7 @@ async function boot() {
   }
 
   function cameraTarget(dt) {
+    if (posterCam) return posterCam;
     const H = curRun.level.H;
     const vh = baseViewH();
     let viewH = vh;
@@ -1648,6 +1654,10 @@ async function boot() {
       ty = d.y + vh * lead + lookY;
       tx = centerXAt(curRun.level, d.y) * 0.6 + d.x * 0.4;
       lean = clamp(vx * 0.07, -40, 40);
+      // close on the spider while it climbs; pull back when it flies, falls or gets washed down
+      const fast = clamp((Math.hypot(vx, vy) - 250) / 900, 0, 1);
+      zoomOut += (fast - zoomOut) * (1 - Math.exp(-dt * (fast > zoomOut ? 5 : 1.2)));
+      viewH = vh * (1 + zoomOut * 0.2);
       if (me.finish) {
         // the top: the camera just over the roof's lip, looking up past the ridge to the sun and the rainbow, the
         // spider small on the gutter at the bottom of the picture
@@ -1770,7 +1780,7 @@ async function boot() {
     const real = nowMs / 1000;
     const dt = Math.min(0.1, Math.max(0, real - lastReal));
     lastReal = real;
-    if (document.hidden) return;
+    if (document.hidden || shot?.done) return;
     try {
       step(dt, real);
       render(dt, real);
@@ -1814,6 +1824,10 @@ async function boot() {
       advance(curRun, curRun.t + simDt, inp, { onDrown: (r) => endMonsoon(r), onHazard: (r, k) => hazardFx(r, k), onFly: (r, f) => flyFx(r, f) });
       myEvents(me);
       if (flow === 'monsoon') playHints(me, dt);
+    } else if (flow === 'shot' && curRun && shot && !shot.frozen) {
+      // store art: the staged run plays up to its moment, then holds still
+      advance(curRun, Math.min(shot.t, curRun.t + simDt), null, { onHazard: (r, k) => hazardFx(r, k), onFly: (r, f) => flyFx(r, f), onFinish: (r) => confettiAt(r, 70) });
+      if (curRun.t + STEP > shot.t + 1e-9) shot.frozen = true;
     } else if (flow === 'race' && curRun?.me && match?.phase === 'round') {
       playHints(curRun.me, dt);
     }
@@ -1878,12 +1892,12 @@ async function boot() {
     const refY = run.me && flow !== 'lobby' && !chasing ? run.me.st.y : cam.y;
     rainAt(run.weather, refY, t, rinfo);
     const warnK = rinfo.warn ? clamp(1 - rinfo.next / rinfo.warn.warn, 0, 1) : 0;
-    const sunny = !!run.me?.finish && run.kind !== 'lobby' && !chasing;
+    const sunny = !!shot?.sunny || (!!run.me?.finish && run.kind !== 'lobby' && !chasing);
     const quiet = run.kind === 'lobby' || flow === 'wardrobe' || flow === 'spouts';
     const calmTarget = quiet ? 0.7 : sunny ? 1 : rinfo.wet || rinfo.warn ? 0 : clamp((rinfo.next - 1.5) / 2, 0, 1);
-    calm += (calmTarget - calm) * (1 - Math.exp(-dt * 2));
+    calm += (calmTarget - calm) * (shot ? 1 : 1 - Math.exp(-dt * 2));
     const gloomTarget = quiet || sunny ? 0 : rinfo.wet ? 1 : warnK;
-    gloom += (gloomTarget - gloom) * (1 - Math.exp(-dt * 3));
+    gloom += (gloomTarget - gloom) * (shot ? 1 : 1 - Math.exp(-dt * 3));
     sunNow = sunny;
     weatherSounds(run, warnK, real, sunny);
     if (run.me && !quiet) setMusicHeight(run.mon ? Math.min(1, run.best / 20000) : run.me.st.y / run.level.H);
@@ -1924,11 +1938,12 @@ async function boot() {
       real,
       cam,
       weather: { gloom, drizzle: warnK, sunny: sunny ? 1 : 0 },
+      snap: !!shot,
       racers: frameRacers,
       ate: run.me?.ate ?? null,
       flood: run.mon ? run.mon.flood : null,
     });
-    drawHud2d(run, t, warnK, real);
+    if (!shot) drawHud2d(run, t, warnK, real);
   }
 
   function weatherSounds(run, warnK, real, sunny) {
@@ -2251,6 +2266,58 @@ async function boot() {
     document.body.dataset.ready = '1';
   }
 
+  // ------------------------------------------------------------ store art (?poster=cover|action|win|multi|icon)
+
+  const LOOKS = {
+    coral: { species: 'jumper', color: '#FF6F59', mark: 'stripes', hat: 'none', trail: 'none', dance: 'hop' },
+    gold: { species: 'peacock', color: '#FFB648', mark: 'chevron', hat: 'flower', trail: 'sparkle', dance: 'wave' },
+    sky: { species: 'orb', color: '#5CC8FF', mark: 'dots', hat: 'beanie', trail: 'bubbles', dance: 'spin' },
+    leaf: { species: 'longlegs', color: '#9BD35A', mark: 'ring', hat: 'acorn', trail: 'leaves', dance: 'drum' },
+    violet: { species: 'tarantula', color: '#A88BFF', mark: 'star', hat: 'crown', trail: 'none', dance: 'flip' },
+    rose: { species: 'jumper', color: '#FF8FB1', mark: 'spots', hat: 'party', trail: 'rainbow', dance: 'hop' },
+  };
+  // Each picture: a race of bots on one spout, stopped at a moment found by simulating it (the sim is deterministic),
+  // and a camera placed on it.
+  const SHOTS = {
+    action: { spout: 3, seed: 11, t: 10.65, n: 5, looks: { b4: 'coral', b0: 'gold', b1: 'sky', b2: 'leaf', b3: 'violet' }, cam: { x: 50, y: 1640, viewH: 300, lean: 50, rise: 40 } },
+    cover: { spout: 8, seed: 10, t: 15.17, n: 5, sign: true, looks: { b2: 'coral', b0: 'gold', b1: 'sky', b3: 'leaf', b4: 'violet' }, cam: { x: -60, y: 2230, viewH: 420, lean: 20, rise: 80 } },
+  };
+
+  async function storeShot(name) {
+    const S = { ...SHOTS[name] };
+    // ?cam=x,y,viewH,lean,rise: try a camera without a rebuild
+    const camQ = params.get('cam')?.split(',').map(Number);
+    if (camQ?.length >= 3 && camQ.every(Number.isFinite)) S.cam = { x: camQ[0], y: camQ[1], viewH: camQ[2], lean: camQ[3] ?? 0, rise: camQ[4] ?? 95 };
+    if (params.has('t')) S.t = Number(params.get('t')) || S.t;
+    juice.reduced = true;
+    hudCanvas.style.display = 'none';
+    uiRoot.style.display = 'none';
+    const seats = BOT_NAMES.slice(0, S.n).map((n, i) => ({ id: `b${i}`, name: n, bot: true, skill: [0.95, 0.8, 0.7, 0.6, 0.85, 0.5][i], index: i }));
+    const run = createRun({ kind: 'race', spout: S.spout, seed: S.seed, seats });
+    for (const r of run.racers) {
+      r.look = { ...(LOOKS[S.looks?.[r.id]] ?? botLook(r.name)) };
+      r.lookSet = true;
+    }
+    const t0 = Math.max(0, S.t - (S.live ?? 0.8));
+    while (advance(run, Math.min(t0, run.t + 1), null) > 0);
+    for (const r of run.racers) if (r.sp) r.sp.events.length = 0;
+    useRun(run);
+    flow = 'shot';
+    shot = { t: S.t, frozen: false, done: false, sunny: !!S.sunny };
+    posterCam = { x: S.cam.x, y: S.cam.y, viewH: S.cam.viewH, lean: S.cam.lean ?? 0, rise: S.cam.rise ?? 95 };
+    camSnap = true;
+    if (S.sign) {
+      const sign = h('div', { class: 'sign poster-sign' }, h('span', { class: 'l1', text: 'Itsy Bitsy' }), h('span', { class: 'l2', text: 'Spider' }));
+      document.body.append(sign);
+    }
+    const t1 = performance.now();
+    while (!shot.frozen && performance.now() - t1 < 8000) await new Promise((r) => setTimeout(r, 30));
+    for (let i = 0; i < 4; i++) await new Promise((r) => requestAnimationFrame(r));
+    shot.done = true;
+    await fontsReady;
+    document.body.dataset.ready = '1';
+  }
+
   // ------------------------------------------------------------ go
 
   await fontsReady;
@@ -2258,6 +2325,7 @@ async function boot() {
   requestAnimationFrame(frame);
   await connect(roomPromise);
   await Promise.race([loadSaves, new Promise((r) => setTimeout(r, 1500))]);
+  if (SHOT) return storeShot(SHOT);
   if (STAGE) return stage(STAGE.slice(7).replace(/[.].*$/, ''));
   if (params.has('view')) {
     // a quick way to look at one spout: ?view=<spout>

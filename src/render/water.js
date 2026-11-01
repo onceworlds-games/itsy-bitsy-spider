@@ -37,6 +37,7 @@ const frag = /* glsl */ `
   uniform vec3 uSky;
   uniform float uFlash;
   uniform float uFlood;
+  uniform float uAmb;
   varying vec3 vW;
   varying vec3 vN;
   varying float vSide;
@@ -116,7 +117,13 @@ const frag = /* glsl */ `
     float fres = pow(1.0 - max(dot(n, v), 0.0), 3.0);
     vec3 col = mix(uDeep, uSky, 0.25 + 0.5 * fres + 0.3 * streak);
     col += uLightColor * spec;
-    col = mix(col, vec3(1.15, 1.2, 1.25), clamp(foam * 0.9 + streak * 0.25 * wet, 0.0, 1.0));
+    // the foam is churned: clumps and holes that tumble down with the water
+    float fy = (y + uTime * sp * 0.92);
+    float fn = noise(vec2(vW.x * 0.11 + vW.z * 0.05, fy * 0.06)) * 0.6 + noise(vec2(vW.x * 0.29, fy * 0.17) + 3.0) * 0.4;
+    float froth = foam * smoothstep(0.22, 0.62, fn + foam * 0.3);
+    col = mix(col, vec3(1.2, 1.24, 1.28), clamp(froth * 0.95 + streak * 0.25 * wet, 0.0, 1.0));
+    // lit like everything else in the pipe: dull under a black squall, dim at night
+    col *= uAmb;
     col += vec3(0.8, 0.85, 1.0) * uFlash * 1.5;
     // the film and drips are darker, glossy
     float wa = max(wet, foam);
@@ -139,6 +146,7 @@ export function createWater(level, outline) {
     uSky: { value: new THREE.Color(0.55, 0.78, 0.92) },
     uFlash: { value: 0 },
     uFlood: { value: -1e6 },
+    uAmb: { value: 1 },
   };
   const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: vert, fragmentShader: frag, transparent: true, depthWrite: false, side: THREE.DoubleSide });
   // dry spots: their boxes
@@ -207,9 +215,10 @@ export function createWater(level, outline) {
       uniforms.uBandCount.value = n;
       return bands;
     },
-    setLight(dir, color) {
+    setLight(dir, color, amb = 1) {
       uniforms.uLight.value.copy(dir).normalize();
       uniforms.uLightColor.value.copy(color);
+      uniforms.uAmb.value = amb;
     },
   };
 }

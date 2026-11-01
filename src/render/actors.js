@@ -197,51 +197,173 @@ export function createDebris() {
 
 // ------------------------------------------------------------------------------------------- the bird
 
+// A house sparrow, sculpted: each part is a sphere pushed into shape, coloured per vertex (chestnut crown, grey cheek,
+// black bib, streaked brown back, barred wings), so it shades smoothly with no textures. Head at the origin, facing +x.
+const tmpC = new THREE.Color();
+function shaped(seg, shape, paint) {
+  const geo = new THREE.SphereGeometry(1, seg, Math.round(seg * 0.66));
+  const pos = geo.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const u = { x: v.x, y: v.y, z: v.z };
+    paint(u, tmpC);
+    shape(v);
+    pos.setXYZ(i, v.x, v.y, v.z);
+    col[i * 3] = tmpC.r;
+    col[i * 3 + 1] = tmpC.g;
+    col[i * 3 + 2] = tmpC.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+const hashN = (a, b) => {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+};
+const SP = {
+  chestnut: new THREE.Color(0x8a4e26),
+  brown: new THREE.Color(0x6e4a2e),
+  dark: new THREE.Color(0x2e2018),
+  buff: new THREE.Color(0xc9a77c),
+  grey: new THREE.Color(0x8d8d88),
+  cream: new THREE.Color(0xe6dccb),
+  white: new THREE.Color(0xf4f0e6),
+  black: new THREE.Color(0x141210),
+};
+
 function sparrow() {
   const g = new THREE.Group();
-  const brown = new THREE.MeshStandardMaterial({ color: 0x8a5a34, roughness: 0.8 });
-  const grey = new THREE.MeshStandardMaterial({ color: 0x9a9890, roughness: 0.8 });
-  const cream = new THREE.MeshStandardMaterial({ color: 0xe8dcc4, roughness: 0.8 });
-  const black = new THREE.MeshPhysicalMaterial({ color: 0x0a0a0a, roughness: 0.1, clearcoat: 1 });
-  const beakM = new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.5 });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), brown);
-  body.scale.set(60, 44, 40);
-  body.position.set(-70, -30, 0);
-  const belly = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), cream);
-  belly.scale.set(50, 34, 32);
-  belly.position.set(-60, -44, 10);
+  const feathers = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 });
+  const gloss = new THREE.MeshPhysicalMaterial({ color: 0x0a0a0a, roughness: 0.08, clearcoat: 1 });
+  const beakM = new THREE.MeshStandardMaterial({ color: 0x3a3028, roughness: 0.45 });
+  const legM = new THREE.MeshStandardMaterial({ color: 0xb58a72, roughness: 0.6 });
+  // the body: a plump chest tapering to the tail, grey-buff below, streaked brown on the back
+  const body = new THREE.Mesh(
+    shaped(
+      28,
+      (v) => {
+        const back = v.x < 0;
+        const k = back ? 1 + v.x * 0.42 : 1 - v.x * v.x * 0.12;
+        v.set(v.x * (back ? 1.3 : 0.9) * 62, v.y * k * (v.y < 0 ? 46 : 40), v.z * k * 40);
+      },
+      (u, c) => {
+        if (u.y < -0.15 + u.x * 0.2) c.copy(SP.cream).lerp(SP.grey, Math.max(0, -u.x) * 0.6);
+        else {
+          c.copy(SP.brown);
+          const streak = hashN(Math.floor(u.x * 9), Math.floor(u.z * 4)) > 0.55;
+          if (streak) c.lerp(SP.dark, 0.7);
+          else if (hashN(Math.floor(u.x * 7) + 3, Math.floor(u.z * 5)) > 0.6) c.lerp(SP.buff, 0.6);
+        }
+      },
+    ),
+    feathers,
+  );
+  body.position.set(-66, -30, 0);
+  body.rotation.z = 0.22;
+  // the wings, folded along the back: chestnut with a white bar and dark tips
+  const wingGeo = shaped(
+    20,
+    (v) => v.set(v.x * 50, v.y * 22, v.z * 9),
+    (u, c) => {
+      if (u.x < -0.55) c.copy(SP.dark);
+      else if (Math.abs(u.x + 0.05) < 0.1 && u.y < 0.3) c.copy(SP.white);
+      else c.copy(hashN(Math.floor(u.x * 8), 1) > 0.5 ? SP.chestnut : SP.brown).lerp(SP.dark, u.y < -0.3 ? 0.5 : 0);
+    },
+  );
+  const wings = [1, -1].map((s) => {
+    const w = new THREE.Mesh(wingGeo, feathers);
+    w.position.set(-78, -16, s * 34);
+    w.rotation.set(s * -0.18, s * 0.12, 0.3);
+    return w;
+  });
+  // the tail: a fan of dark feathers, cocked up
+  const tail = new THREE.Group();
+  const featherGeo = shaped(
+    10,
+    (v) => v.set(v.x * 34 - 30, v.y * 4, v.z * 9),
+    (u, c) => c.copy(SP.dark).lerp(SP.brown, 0.35 + u.x * 0.2),
+  );
+  for (let i = -2; i <= 2; i++) {
+    const f = new THREE.Mesh(featherGeo, feathers);
+    f.rotation.set(i * 0.12, i * 0.16, 0);
+    f.position.z = i * 4;
+    tail.add(f);
+  }
+  tail.position.set(-136, -18, 0);
+  tail.rotation.z = 0.32;
+  // the head: chestnut crown, grey cap, white cheek, black bib under the beak
   const head = new THREE.Group();
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(30, 18, 12), grey);
-  const cheek = new THREE.Mesh(new THREE.SphereGeometry(24, 14, 10), cream);
-  cheek.position.set(8, -8, 14);
-  const bib = new THREE.Mesh(new THREE.SphereGeometry(18, 12, 8), black);
-  bib.position.set(10, -22, 6);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(31, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.4), brown);
-  cap.rotation.z = -0.4;
-  const beak = new THREE.Mesh(new THREE.ConeGeometry(9, 30, 10), beakM);
+  const skull = new THREE.Mesh(
+    shaped(
+      26,
+      (v) => v.set(v.x * 31, v.y * 29, v.z * 28),
+      (u, c) => {
+        if (u.y < -0.35 && u.x > -0.1) c.copy(SP.black);
+        else if (u.y > 0.62 && u.x > -0.2) c.copy(SP.grey);
+        else if (Math.abs(u.z) > 0.55 && u.y < 0.35 && u.x > -0.35) c.copy(SP.white);
+        else if (u.y > 0.05 || u.x < -0.25) c.copy(SP.chestnut);
+        else c.copy(SP.cream);
+        if (u.x > 0.55 && Math.abs(u.y) < 0.25 && Math.abs(u.z) < 0.6) c.copy(SP.black); // the lores
+      },
+    ),
+    feathers,
+  );
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(8.5, 24, 12), beakM);
   beak.rotation.z = -Math.PI / 2;
-  beak.position.set(38, -4, 0);
-  const eye = new THREE.Mesh(new THREE.SphereGeometry(6, 10, 8), black);
-  eye.position.set(18, 6, 22);
-  const glint = new THREE.Mesh(new THREE.SphereGeometry(1.6, 6, 4), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 3, 3) }));
-  glint.position.set(21, 9, 27);
-  head.add(skull, cheek, bib, cap, beak, eye, glint);
-  g.add(body, belly, head);
+  beak.position.set(36, -5, 0);
+  const eyes = [1, -1].map((s) => {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(5.2, 12, 8), gloss);
+    e.position.set(17, 5, s * 23);
+    const glint = new THREE.Mesh(new THREE.SphereGeometry(1.4, 6, 4), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 3, 3) }));
+    glint.position.set(2, 2, s * 4);
+    e.add(glint);
+    return e;
+  });
+  head.add(skull, beak, ...eyes);
+  // the legs, gripping
+  const legs = [1, -1].map((s) => {
+    const l = new THREE.Group();
+    const shin = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.8, 30, 6), legM);
+    shin.position.y = -15;
+    l.add(shin);
+    for (const a of [-0.6, 0, 0.6, Math.PI]) {
+      const toe = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 16, 5), legM);
+      toe.rotation.set(0, a, Math.PI / 2);
+      toe.position.set(Math.cos(a) * 7, -30, -Math.sin(a) * 7);
+      l.add(toe);
+    }
+    l.position.set(-56, -66, s * 16);
+    return l;
+  });
+  g.add(body, ...wings, tail, head, ...legs);
   g.traverse((o) => o.isMesh && (o.castShadow = true));
   g.userData.head = head;
+  g.userData.tail = tail;
+  g.userData.wings = wings;
+  g.userData.body = body;
   return g;
 }
 
 export function createBirds(level, seed) {
   const group = new THREE.Group();
   const seams = level.features.filter((f) => f.kind === 'seam');
+  const pegMat = new THREE.MeshStandardMaterial({ color: 0x5e4630, roughness: 0.85 });
+  const pegGeo = new THREE.CylinderGeometry(4.2, 5.5, 130, 8);
+  pegGeo.rotateZ(Math.PI / 2);
   const birds = seams.map((seam) => {
     const b = sparrow();
     const s = seam.side === 'L' ? -1 : 1;
     // outside the wall, looking in: the head points towards the pipe
     b.scale.set(-s * 0.55, 0.55, 0.55);
     group.add(b);
-    return { seam, b, s };
+    // its perch: an old peg driven into the wall beside the pipe
+    const peg = new THREE.Mesh(pegGeo, pegMat);
+    peg.castShadow = true;
+    group.add(peg);
+    return { seam, b, s, peg, placed: false };
   });
   const st = {};
   return {
@@ -259,8 +381,20 @@ export function createBirds(level, seed) {
         else if (st.phase === 'windup') reach = -0.25 * st.k;
         else if (st.phase === 'peck') reach = st.reach;
         b.position.set(outer - s * reach * (BIRD_REACH + 26), seam.y - 6 + bob, -D2 * 0.2);
-        const head = b.userData.head;
-        head.rotation.z = st.phase === 'look' ? Math.sin(t * 7) * 0.25 : st.phase === 'windup' ? 0.35 : -0.15;
+        if (!it.placed) {
+          it.placed = true;
+          it.peg.position.set(outer + s * 40, seam.y - 6 - 54, -D2 * 0.2);
+        }
+        const { head, tail, wings, body } = b.userData;
+        // a sparrow never keeps still: quick head turns, a tail that flicks, wings that shiver before it strikes
+        const flick = Math.max(0, Math.sin(t * 3.1 + it.s)) ** 12;
+        head.rotation.z = st.phase === 'look' ? Math.sin(t * 7) * 0.25 : st.phase === 'windup' ? 0.35 + st.k * 0.15 : st.phase === 'peck' ? -0.35 : -0.15;
+        head.rotation.y = st.phase === 'look' ? (Math.floor(t * 2.3) % 2 ? 0.35 : -0.2) : 0;
+        tail.rotation.z = 0.32 + flick * 0.5 + (st.phase === 'peck' ? 0.3 : 0);
+        const shiver = st.phase === 'windup' ? Math.sin(t * 60) * 0.12 * st.k : 0;
+        wings[0].rotation.x = -0.18 - shiver - (st.phase === 'peck' ? 0.5 : 0);
+        wings[1].rotation.x = 0.18 + shiver + (st.phase === 'peck' ? 0.5 : 0);
+        body.scale.y = 1 + Math.sin(t * 9) * 0.02;
       }
     },
   };

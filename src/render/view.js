@@ -105,10 +105,10 @@ export function createView(host, opts = {}) {
     const level = run.level;
     const hr = cur.hour;
     // ---- mood
-    const k = 1 - Math.exp(-dt * 2.5);
+    const k = s.snap ? 1 : 1 - Math.exp(-dt * 2.5);
     mood.gloom += ((s.weather?.gloom ?? 0) - mood.gloom) * k;
     mood.sunny += ((s.weather?.sunny ?? 0) - mood.sunny) * k;
-    mood.drizzle += ((s.weather?.drizzle ?? 0) - mood.drizzle) * (1 - Math.exp(-dt * 4));
+    mood.drizzle += ((s.weather?.drizzle ?? 0) - mood.drizzle) * (s.snap ? 1 : 1 - Math.exp(-dt * 4));
     const g = Math.max(0, mood.gloom - mood.sunny);
     const flash = juice.flash;
     const L = stage.lights;
@@ -166,7 +166,7 @@ export function createView(host, opts = {}) {
     // ---- world
     cur.world.update(s.real, { storm: g });
     const bands = cur.water.update(run.weather, s.t, mood.drizzle, flash, s.flood);
-    cur.water.setLight(sunDir, L.sun.color);
+    cur.water.setLight(sunDir, L.sun.color, (1 - g * 0.5) * (1 - hr.night * 0.5));
     rain.update(s.real, camera.position, Math.min(1, 0.06 + g * 0.85 + mood.drizzle * 0.3 + (run.def.lightning ? 0.1 : 0)) * (1 - mood.sunny), 0.12 + g * 0.25, flash);
     cur.flies.update(s.real, dt, s.ate ?? null, fx);
     cur.debris.update(level, run.weather, y0, y1, s.t);
@@ -181,14 +181,29 @@ export function createView(host, opts = {}) {
         l.intensity = (hr.night ? 2.2e5 : 1.2e5) * (0.85 + Math.sin(s.real * 13 + i) * 0.03);
       } else l.intensity = 0;
     });
-    // spray where the water's front is in view
+    // spray where the water's front is in view: off the walls, and a mist of drops thrown ahead of it
     for (const b of bands) {
       if (b.front > y0 && b.front < y1 + 100 && b.front < b.tail) {
         const n = Math.min(4, Math.ceil(dt * 160 * b.heavy));
+        const cxF = centerXAt(level, b.front);
         for (let i = 0; i < n; i++) {
           const side = Math.random() < 0.5 ? -1 : 1;
-          const x = centerXAt(level, b.front) + side * (80 + Math.random() * 18);
-          fx.spray(b.front > 0 ? x : x, b.front + 6, 1, Math.PI / 2 + side * 0.5, 1.2, 220, D2 * (Math.random() * 1.6 - 0.8));
+          const x = cxF + side * (80 + Math.random() * 18);
+          fx.spray(x, b.front + 6, 1, Math.PI / 2 + side * 0.5, 1.2, 220, D2 * (Math.random() * 1.6 - 0.8));
+        }
+        const m = Math.min(6, Math.ceil(dt * 240 * b.heavy));
+        for (let i = 0; i < m; i++) {
+          const x = cxF + (Math.random() - 0.5) * 170;
+          fx.spray(x, b.front + Math.random() * 14, 1, -Math.PI / 2 + (Math.random() - 0.5) * 1.1, 0.5, 520, -D2 * 0.6 + Math.random() * D2 * 0.9);
+        }
+      }
+      // where the water lands on a twig, a leaf or a bolt it bursts off both ends: the dry spot under it shows
+      if (b.front < y1 && b.tail > y0) {
+        for (const pb of level.pocketBoxes) {
+          if (pb.y1 < y0 - 30 || pb.y1 > y1 + 30 || b.front > pb.y1 || b.tail < pb.y1 + 30) continue;
+          if (Math.random() > dt * 50 * b.heavy) continue;
+          const left = Math.random() < 0.5;
+          fx.spray(left ? pb.x0 + 4 : pb.x1 - 4, pb.y1 + 2, 2, left ? Math.PI - 0.7 : 0.7, 0.9, 240, -D2 * 0.5 + Math.random() * D2);
         }
       }
     }
