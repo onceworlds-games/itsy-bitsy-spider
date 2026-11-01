@@ -143,8 +143,8 @@ export function buildFacade(level, theme) {
       const sg = new THREE.ShapeGeometry(shape, 24);
       const uv = sg.attributes.uv;
       const pp = sg.attributes.position;
-      const tile = theme.wall.tile;
-      for (let i = 0; i < uv.count; i++) uv.setXY(i, pp.getX(i) / tile[0], pp.getY(i) / tile[1]);
+      // world units: the wall material repeats every tile
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, pp.getX(i), pp.getY(i));
       sg.translate(0, 0, ZW);
       const ms = new THREE.Mesh(sg, wallMat);
       ms.receiveShadow = true;
@@ -199,7 +199,7 @@ export function buildFacade(level, theme) {
     }
   }
   if (revealGeo.count) {
-    const m = new THREE.Mesh(revealGeo.build(theme.wall.tile), wallMat);
+    const m = new THREE.Mesh(revealGeo.build(1), wallMat);
     m.receiveShadow = true;
     group.add(m);
   }
@@ -211,7 +211,7 @@ export function buildFacade(level, theme) {
   }
   if (sillGeo.count) {
     const sm = pbr('Concrete036', { tile: 900, color: 0xe2dccd, key: 'sill' });
-    const m = new THREE.Mesh(sillGeo.build(900), sm);
+    const m = new THREE.Mesh(sillGeo.build(1), sm);
     m.castShadow = true;
     m.receiveShadow = true;
     group.add(m);
@@ -267,9 +267,6 @@ export function buildFacade(level, theme) {
     m.receiveShadow = true;
     m.rotation.x = 0;
     group.add(m);
-    // fix world-unit UVs to tiles
-    const uv = m.geometry.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / ground.tile, uv.getY(i) / ground.tile);
   }
   const props = buildProps(level, theme, rnd, ZW);
   group.add(props.group);
@@ -774,12 +771,13 @@ function roof(level, theme, top) {
   soffit.position.set(0, top, (ZW + (-D2 - WALL_T)) / 2);
   g.add(soffit);
   const pitch = THREE.MathUtils.degToRad(theme.roof?.glass ? 26 : 38);
-  const len = 7000;
+  // a short pitch up to a ridge, so the sky and the sun are right there above the gutter when you reach the top
+  const len = 640;
   const rt = theme.roof.tile;
-  const tiles = pbr(theme.roof.id, { tile: rt, color: theme.roof.color, normal: 1.4, key: `roof:${theme.key}` });
+  const tiles = pbr(theme.roof.id, { tile: rt, color: theme.roof.color, normal: 1.4, env: 0.3, key: `roof:${theme.key}` });
   const geo = new THREE.PlaneGeometry(12000, len);
   const uv = geo.attributes.uv;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) * 12000) / rt, (uv.getY(i) * len) / rt);
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 12000, uv.getY(i) * len); // world units: the material repeats every tile
   geo.translate(0, len / 2, 0);
   const plane = new THREE.Mesh(geo, tiles);
   plane.rotation.x = -(Math.PI / 2 - pitch);
@@ -792,5 +790,18 @@ function roof(level, theme, top) {
   lip.position.set(0, H + 175, -D2 - WALL_T + 20);
   lip.castShadow = true;
   g.add(lip);
+  // the ridge: a row of round capping tiles along the top, the far slope falling away behind it
+  const rx = H + 170 + Math.sin(pitch) * len;
+  const rz = -D2 - WALL_T - 10 - Math.cos(pitch) * len;
+  const capMat = plain(`ridge:${theme.key}`, { color: new THREE.Color(theme.roof.color).multiplyScalar(0.8), roughness: 0.75 });
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(34, 34, 12000, 14, 1, false, 0, Math.PI), capMat);
+  cap.rotation.z = Math.PI / 2; // along the ridge, round side up
+  cap.position.set(0, rx + 4, rz);
+  cap.castShadow = true;
+  g.add(cap);
+  const back = new THREE.Mesh(geo.clone(), tiles);
+  back.rotation.x = -(Math.PI / 2 + pitch);
+  back.position.set(0, rx, rz);
+  g.add(back);
   return g;
 }

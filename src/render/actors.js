@@ -25,10 +25,26 @@ const flyMats = {
   wing: new THREE.MeshBasicMaterial({ color: 0xd8e8f0, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false }),
   glow: new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 3, 1.2), transparent: true, opacity: 0.6, depthWrite: false }),
 };
+const haloTex = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,0.9)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.35)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+flyMats.halo = new THREE.SpriteMaterial({ map: haloTex, color: new THREE.Color(1.1, 1.3, 1.1), transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
+flyMats.haloGold = new THREE.SpriteMaterial({ map: haloTex, color: new THREE.Color(3, 2.2, 0.7), transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending });
 
 function makeFly(gold) {
   const g = new THREE.Group();
-  const s = gold ? 1.5 : 1;
+  const s = gold ? 2.1 : 1.45;
   const body = new THREE.Mesh(flyGeo.body, gold ? flyMats.gold : flyMats.body);
   body.scale.set(4.5 * s, 2.6 * s, 2.6 * s);
   const head = new THREE.Mesh(flyGeo.body, gold ? flyMats.gold : flyMats.body);
@@ -45,12 +61,13 @@ function makeFly(gold) {
   const wr = wl.clone();
   wr.position.z = -0.6 * s;
   g.add(body, head, eyeL, eyeR, wl, wr);
-  if (gold) {
-    const halo = new THREE.Mesh(new THREE.SphereGeometry(9, 12, 8), flyMats.glow);
-    halo.scale.setScalar(1);
-    g.add(halo);
-    g.userData.halo = halo;
-  }
+  // a soft glow behind it, so a fly reads against the zinc from across the pipe (a big warm one for the golden fly)
+  const halo = new THREE.Sprite(gold ? flyMats.haloGold : flyMats.halo);
+  halo.scale.setScalar(gold ? 54 : 30);
+  halo.position.z = -2;
+  g.add(halo);
+  g.userData.halo = halo;
+  g.userData.gold = gold;
   body.castShadow = true;
   g.userData.wings = [wl, wr];
   return g;
@@ -86,8 +103,9 @@ export function createFlies(level) {
         const w = Math.sin(t * 90 + ph) * 0.9;
         it.m.userData.wings[0].rotation.x = -0.4 + w;
         it.m.userData.wings[1].rotation.x = 0.4 - w;
-        if (it.m.userData.halo) {
-          it.m.userData.halo.scale.setScalar(0.8 + Math.sin(t * 5) * 0.15);
+        const hs = it.m.userData.gold ? 54 : 30;
+        it.m.userData.halo.scale.setScalar(hs * (0.85 + Math.sin(t * 5 + ph) * 0.15));
+        if (it.m.userData.gold) {
           if (fx && Math.random() < dt * 6) fx.glint(it.m.position.x + (Math.random() - 0.5) * 18, it.m.position.y + (Math.random() - 0.5) * 18, 12, 5, [3, 2.4, 0.8]);
         }
       }

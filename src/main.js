@@ -116,6 +116,7 @@ async function boot() {
   const quality = () => safe(() => ow.settings.quality) ?? params.get('q') ?? 'high';
   const reduced = () => !!safe(() => ow.settings.reducedMotion);
   const view = createView(document.getElementById('stage'), { quality: quality(), preserve: !!STAGE || params.has('shot') });
+  if (params.has('debug')) window.__view = view;
   const juice = view.juice;
   const fx = view.fx;
   const hudCanvas = document.getElementById('hudc');
@@ -1613,6 +1614,7 @@ async function boot() {
     let tx = null;
     let lean = 0;
     let rise = 95;
+    let topShot = false;
     if (flow === 'title' && attract) {
       let best = null;
       for (const r of attract.racers) if (!best || r.st.y > best.st.y) best = r;
@@ -1647,8 +1649,13 @@ async function boot() {
       tx = centerXAt(curRun.level, d.y) * 0.6 + d.x * 0.4;
       lean = clamp(vx * 0.07, -40, 40);
       if (me.finish) {
-        ty = Math.max(ty, Math.min(H + 240, d.y + vh * 0.3));
-        viewH = vh * 1.2;
+        // the top: the camera just over the roof's lip, looking up past the ridge to the sun and the rainbow, the
+        // spider small on the gutter at the bottom of the picture
+        viewH = vh * 1.5;
+        const dist = viewH / 2 / Math.tan((15 * Math.PI) / 180);
+        rise = -Math.tan((5 * Math.PI) / 180) * dist;
+        ty = H + 200 - rise;
+        topShot = true;
       }
       if (curRun.mon) ty = Math.max(ty, curRun.mon.flood + vh * 0.38);
     } else {
@@ -1673,7 +1680,7 @@ async function boot() {
     }
     const lo = viewH * 0.3 - 60;
     const hi = H + 560 - viewH * 0.5;
-    const free = flow === 'wardrobe' || flow === 'lobby' || flow === 'spouts';
+    const free = flow === 'wardrobe' || flow === 'lobby' || flow === 'spouts' || topShot;
     return { y: free ? ty : clamp(ty, Math.min(lo, hi), Math.max(lo, hi)), x: tx, viewH, lean, rise };
   }
   let lookY = 0;

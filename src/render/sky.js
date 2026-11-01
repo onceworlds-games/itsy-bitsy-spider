@@ -16,6 +16,8 @@ export function createSky() {
     night: { value: 0 },
     flash: { value: 0 },
     time: { value: 0 },
+    rainbow: { value: 0 },
+    rbDir: { value: new THREE.Vector3(-0.25, -0.42, -0.87).normalize() },
   };
   const mat = new THREE.ShaderMaterial({
     uniforms,
@@ -31,7 +33,8 @@ export function createSky() {
       }`,
     fragmentShader: /* glsl */ `
       uniform vec3 top, hor, stormTop, stormHor, sunDir, sunColor;
-      uniform float storm, night, flash, time;
+      uniform float storm, night, flash, time, rainbow;
+      uniform vec3 rbDir;
       varying vec3 vDir;
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p) {
@@ -43,13 +46,19 @@ export function createSky() {
       void main() {
         vec3 d = normalize(vDir);
         float y = max(d.y, -0.2);
-        vec3 clear = mix(hor, top, pow(clamp(y, 0.0, 1.0), 0.55));
+        // after the rain the air is washed clean: a deeper, clearer blue
+        vec3 h2 = mix(hor, vec3(0.3, 0.56, 0.95), rainbow * 0.7);
+        vec3 t2 = mix(top, vec3(0.07, 0.26, 0.82), rainbow * 0.7);
+        vec3 clear = mix(h2, t2, pow(clamp(y, 0.0, 1.0), 0.55));
         vec3 dark = mix(stormHor, stormTop, pow(clamp(y, 0.0, 1.0), 0.7));
         // clouds on a plane above
         vec2 uv = d.xz / max(0.08, d.y + 0.12) * 0.9 + vec2(time * 0.01, time * 0.004);
         float c = fbm(uv * 1.3);
-        float cover = mix(0.62, 0.18, storm);
+        float cover = mix(0.62, 0.18, storm) + rainbow * 0.1;
         float cl = smoothstep(cover, cover + 0.25, c);
+        // when the sun comes out after the rain, the clouds part round it
+        float sAt = max(dot(d, sunDir), 0.0);
+        cl *= 1.0 - smoothstep(0.9, 0.99, sAt) * rainbow;
         vec3 cloudLit = mix(vec3(1.02, 1.0, 0.97), vec3(0.5, 0.55, 0.62), storm);
         vec3 cloudShade = mix(vec3(0.72, 0.76, 0.84), vec3(0.16, 0.19, 0.24), storm);
         float sh = smoothstep(0.3, 0.9, fbm(uv * 1.3 + vec2(0.08, 0.05)));
@@ -59,8 +68,17 @@ export function createSky() {
         // the sun, its glow and a silver lining when it's out
         float s = max(dot(d, sunDir), 0.0);
         float sunVis = (1.0 - storm) * (1.0 - night * 0.9);
-        col += sunColor * (pow(s, 900.0) * 30.0 + pow(s, 24.0) * 0.6 + pow(s, 4.0) * 0.18) * sunVis * (1.0 - cl * 0.85);
-        col += sunColor * pow(s, 10.0) * cl * 0.6 * sunVis;
+        col += sunColor * (smoothstep(0.99975, 0.99988, s) * 2.6 + pow(s, 900.0) * 0.35 + pow(s, 90.0) * 0.14 + pow(s, 8.0) * 0.05) * sunVis * (1.0 - cl * 0.85);
+        col += sunColor * pow(s, 10.0) * cl * 0.25 * sunVis;
+        // the rainbow after the rain: a band at 42 degrees round a point below the horizon, red outside
+        if (rainbow > 0.0) {
+          float ang = acos(clamp(dot(d, rbDir), -1.0, 1.0));
+          float r = (ang - 0.73) / 0.045;
+          if (abs(r) < 1.0) {
+            vec3 hue = clamp(abs(fract(vec3(0.0, 0.67, 0.33) + (r * 0.5 + 0.5) * 0.8) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+            col += hue * rainbow * 0.45 * (1.0 - r * r) * smoothstep(0.0, 0.12, d.y) * (1.0 - cl * 0.6);
+          }
+        }
         // night: stars
         if (night > 0.0) {
           vec2 sp = d.xz / max(0.1, d.y) * 60.0;

@@ -120,7 +120,7 @@ export function createStage(host, opts = {}) {
     composer.setSize(W, Hh);
     composer.addPass(new RenderPass(scene, camera));
     if (quality !== 'low') {
-      bloom = new UnrealBloomPass(new THREE.Vector2(W / 2, Hh / 2), 0.45, 0.55, 0.92);
+      bloom = new UnrealBloomPass(new THREE.Vector2(W / 2, Hh / 2), 0.45, 0.42, 1.15);
       composer.addPass(bloom);
     }
     grade = new ShaderPass(GradeShader);

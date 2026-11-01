@@ -52,7 +52,9 @@ const frag = /* glsl */ `
       if (i >= uDryCount) break;
       vec4 b = uDry[i];
       vec2 q = min(p - b.xy, b.zw - p);
-      float inside = smoothstep(-2.0, 6.0, min(q.x, q.y));
+      // soft, ragged edges: the water parts round the thing above rather than stopping at a box
+      float rag = noise(p * 0.09 + vec2(uTime * 0.7, uTime * 2.1)) * 10.0;
+      float inside = smoothstep(-6.0, 18.0, min(q.x, q.y) + rag - 5.0);
       d = max(d, inside);
     }
     return d;
@@ -96,7 +98,9 @@ const frag = /* glsl */ `
       float line = 1.0 - smoothstep(0.0, 2.2, abs(fract(vW.x / 9.0) - 0.5) * 9.0);
       drip = has * line * smoothstep(0.55, 0.62, seg) * (1.0 - smoothstep(0.9, 1.0, seg)) * uDrizzle * (1.0 - dry);
     }
-    float a = max(max(wet * (0.78 + 0.2 * strength), film * 0.35), drip * 0.8);
+    float a = max(max(wet * (0.64 + 0.26 * strength), film * 0.35), drip * 0.8);
+    // the film on the walls is thin and clear: a spider holding on under it still shows through
+    if (vSide > 0.5) a *= 0.5;
     if (a < 0.003) discard;
     // flowing streaks: stretched noise moving down fast
     float sp = ${FRONT_SPEED.toFixed(1)};

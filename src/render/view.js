@@ -45,6 +45,8 @@ export function createView(host, opts = {}) {
 
   let cur = null; // { run, world, water, flies, debris, birds, rigs: Map }
   const tmpV = new THREE.Vector3();
+  const SKY_SUN = new THREE.Vector3(-0.45, 0.55, -0.7).normalize();
+  const PAYOFF_SUN = new THREE.Vector3(0.2, 0.28, -0.94).normalize();
   const sunDir = new THREE.Vector3(-0.32, 0.78, 0.54).normalize();
   const mood = { calm: 1, gloom: 0, drizzle: 0, flash: 0, sunny: 0, storm: 0 };
   const camState = { x: 0, y: 0, viewH: 560, lean: 0 };
@@ -120,7 +122,8 @@ export function createView(host, opts = {}) {
     stage.scene.environmentIntensity = hr.env * (1 - g * 0.35) + flash;
     const gu = stage.grade;
     gu.exposure.value = hr.exposure * (1 + mood.sunny * 0.08) * (1 - g * 0.06);
-    const warm = hr.warm * (1 - g) + mood.sunny * 0.05 - g * 0.05;
+    // the sun after the rain is a clean light: the warm grade backs off so the washed sky reads blue
+    const warm = (hr.warm * (1 - g) - g * 0.05) * (1 - mood.sunny * 0.6);
     gu.gain.value.set(1 + warm, 1, 1 - warm * 1.2);
     gu.lift.value.set(0.01, 0.015, 0.03 + g * 0.02);
     gu.sat.value = 1.08 - g * 0.3 + mood.sunny * 0.1;
@@ -130,11 +133,14 @@ export function createView(host, opts = {}) {
     gu.flashColor.value.copy(juice.flashColor);
     gu.aberr.value = juice.trauma * 1.5;
     scene.fog.color.setRGB(hr.fog[0], hr.fog[1], hr.fog[2]).lerp(tmpColor.setRGB(0.4, 0.46, 0.54).multiplyScalar(hr.night ? 0.4 : 1), g * 0.7);
-    sky.uniforms.storm.value = Math.min(1, g * 1.1 + (run.def.lightning ? 0.15 : 0));
+    sky.uniforms.storm.value = Math.min(1, g * 1.1 + (run.def.lightning ? 0.15 : 0)) * (1 - mood.sunny * 0.9);
+    // out came the sun: it swings round over the ridge, and a rainbow comes up behind the roof
+    sky.uniforms.sunDir.value.copy(SKY_SUN).lerp(PAYOFF_SUN, mood.sunny).normalize();
+    sky.uniforms.rainbow.value = mood.sunny * (1 - hr.night);
     sky.uniforms.night.value = hr.night;
     sky.uniforms.flash.value = flash;
     sky.uniforms.time.value = s.real;
-    if (stage.bloom) stage.bloom.strength = 0.42 + mood.sunny * 0.25 + flash * 0.4;
+    if (stage.bloom) stage.bloom.strength = 0.42 + mood.sunny * 0.08 + flash * 0.4;
 
     // ---- camera
     const c = s.cam;

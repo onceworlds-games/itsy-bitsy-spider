@@ -223,7 +223,7 @@ function pot(rnd, size = 1) {
 
 function wateringCan(rnd) {
   const g = new THREE.Group();
-  const zinc = pbr('Metal021', { tile: 300, metal: 1, rough: 0.6, color: 0x9fb0a0, key: 'canZinc' });
+  const zinc = pbr('Metal021', { tile: [0.5, 1], metal: 1, rough: 0.6, color: 0x9fb0a0, key: 'canZinc' });
   const body = new THREE.Mesh(new THREE.CylinderGeometry(150, 165, 330, 28), zinc);
   body.position.y = 165;
   const spout = new THREE.Mesh(new THREE.CylinderGeometry(14, 26, 420, 12), zinc);
@@ -277,7 +277,7 @@ function tools(rnd) {
 
 function bucket(rnd) {
   const g = new THREE.Group();
-  const m = pbr('Metal062C', { tile: 300, metal: 1, rough: 0.6, color: 0xc0c8cc, key: 'bucket' });
+  const m = pbr('Metal062C', { tile: [0.5, 1], metal: 1, rough: 0.6, color: 0xc0c8cc, key: 'bucket' });
   const body = lathe([[0, 0], [150, 0], [190, 330], [196, 340], [0, 340]], 28, m);
   const water = new THREE.Mesh(new THREE.CircleGeometry(182, 28), new THREE.MeshPhysicalMaterial({ color: 0x1a2a34, roughness: 0.02, clearcoat: 1 }));
   water.rotation.x = -Math.PI / 2;
@@ -292,7 +292,7 @@ function bucket(rnd) {
 
 function crates(rnd) {
   const g = new THREE.Group();
-  const wood = pbr('WoodSiding005', { tile: 500, color: 0xd8b088, key: 'crate' });
+  const wood = pbr('WoodSiding005', { tile: 1, color: 0xd8b088, key: 'crate' });
   for (let k = 0; k < 2; k++) {
     const c = new THREE.Mesh(new THREE.BoxGeometry(520, 340, 380), wood);
     c.position.set(k * 80 - 40, 170 + k * 340, 0);
@@ -413,7 +413,7 @@ function buoy(rnd) {
 }
 
 function milk(rnd) {
-  const m = pbr('Metal062C', { tile: 400, metal: 1, rough: 0.5, color: 0xd0d6da, key: 'churn' });
+  const m = pbr('Metal062C', { tile: [0.5, 1], metal: 1, rough: 0.5, color: 0xd0d6da, key: 'churn' });
   const g = new THREE.Group();
   g.add(lathe([[0, 0], [200, 0], [210, 30], [200, 620], [120, 760], [110, 860], [140, 880], [140, 920], [0, 930]], 28, m));
   g.userData.depth = 260;

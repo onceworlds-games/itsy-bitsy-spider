@@ -182,7 +182,7 @@ export function buildPipe(level, theme = {}) {
     }
   }
   if (dark.count) {
-    const m = new THREE.Mesh(dark.build(220), iron);
+    const m = new THREE.Mesh(dark.build(1), iron);
     m.castShadow = true;
     m.receiveShadow = true;
     group.add(m);
@@ -240,21 +240,44 @@ function islandMesh(isl, rnd) {
     g.add(m);
     return g;
   }
-  // twigs: a raft of sticks wedged front to back
-  const bark = pbr('WoodSiding008', { tile: [60, 180], rough: 1, color: 0x7a5a42, normal: 1.4, key: 'bark' });
-  const n = Math.max(2, Math.round(isl.len / (isl.t * 1.05)));
+  // twigs: three or four sticks jammed front to back, crossing a little, a few side shoots and a leaf caught in them
+  const bark = pbr('WoodSiding008', { tile: [60, 180], rough: 1, color: 0xa07a58, normal: 1.4, key: 'bark' });
+  const n = Math.max(2, Math.min(4, Math.round(isl.len / 30)));
   const step = isl.len / n;
   for (let k = 0; k < n; k++) {
-    const r = (isl.t / 2) * (0.88 + rnd() * 0.22);
-    const len = DEPTH + 26 + rnd() * 40;
+    const r = (isl.t / 2) * (0.62 + rnd() * 0.3);
+    const len = DEPTH + 30 + rnd() * 50;
     const geo = twigGeometry(r, len, rnd);
     const m = new THREE.Mesh(geo, bark);
-    m.position.set(-isl.len / 2 + step * (k + 0.5), (isl.t / 2 - r) * 0.5, (rnd() - 0.5) * 18);
-    m.rotation.set(Math.PI / 2, 0, (rnd() - 0.5) * 0.25);
-    m.rotation.y = (rnd() - 0.5) * 0.18;
+    m.position.set(-isl.len / 2 + step * (k + 0.5) + (rnd() - 0.5) * step * 0.3, (isl.t / 2 - r) * 0.3 - r * 0.2, (rnd() - 0.5) * 20);
+    m.rotation.set(Math.PI / 2, 0, (k % 2 ? 1 : -1) * (0.12 + rnd() * 0.22));
     m.castShadow = true;
     m.receiveShadow = true;
     g.add(m);
+    // a side shoot or two
+    for (let j = 0; j < 2; j++) {
+      if (rnd() < 0.45) continue;
+      const sr = r * 0.4;
+      const sl = 14 + rnd() * 22;
+      const shoot = new THREE.Mesh(twigGeometry(sr, sl, rnd), bark);
+      const along = (rnd() - 0.5) * DEPTH * 0.8;
+      const side = rnd() < 0.5 ? -1 : 1;
+      shoot.position.set(m.position.x + side * (r + sl * 0.35), m.position.y + r * 0.6, m.position.z + along);
+      shoot.rotation.set(0, 0, side * (0.9 + rnd() * 0.5));
+      shoot.castShadow = true;
+      g.add(shoot);
+    }
+  }
+  // a dead leaf snagged across the top
+  if (rnd() < 0.7) {
+    const leafMat = leafMaterial(1 + Math.floor(rnd() * 2));
+    const leaf = new THREE.Mesh(leafGeometry(isl.len * 0.45, isl.len * 0.75, 4, rnd), leafMat);
+    leaf.position.set((rnd() - 0.5) * isl.len * 0.4, isl.t / 2 - 1, (rnd() - 0.5) * 30);
+    leaf.rotation.y = (rnd() - 0.5) * 2.4;
+    leaf.rotation.z = (rnd() - 0.5) * 0.2;
+    leaf.receiveShadow = true;
+    leaf.castShadow = true;
+    g.add(leaf);
   }
   return g;
 }
@@ -274,7 +297,7 @@ function twigGeometry(r, len, rnd) {
   geo.computeVertexNormals();
   // UVs in units: round the stick and along it
   const uv = geo.attributes.uv;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * 2.5);
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * Math.PI * 2 * r * 3, uv.getY(i) * len * 1.2);
   return geo;
 }
 
@@ -380,7 +403,7 @@ function mossMesh(level, f, rnd) {
     const zf = -D2 + (DEPTH - 6) * (0.55 + 0.45 * Math.max(0, ends));
     geo.faceAuto([[x0, y, -D2], [x1, y1, -D2], [x1, y1, zf], [x0, y, zf]], [-s, 0, 0], [[y, -D2], [y1, -D2], [y1, zf], [y, zf]]);
   }
-  const m = new THREE.Mesh(geo.build(140), moss);
+  const m = new THREE.Mesh(geo.build(1), moss);
   m.receiveShadow = true;
   g.add(m);
   // cushions of moss along the wall, spilling onto the cut edge and the back plate
@@ -597,7 +620,9 @@ function gutterMesh(level, theme) {
   const last = level.spans[level.spans.length - 1];
   const cx = last.cx;
   const half = last.half;
-  const zinc = zincMat();
+  // seen from above against a bright sky the gutter catches it all: a duller coat so it doesn't burn out
+  const zinc = zincMat({ key: 'gutter', color: new THREE.Color(1.2, 1.25, 1.3), env: 0.85 });
+  const beadMat = zincMat({ key: 'gutterBead', color: new THREE.Color(0.95, 1.0, 1.05), env: 0.6 });
   const reach = 2600;
   const geo = new Geo();
   // the floor (cut through at the pipe's mouth), its back wall rising, the rolled bead along the back top
@@ -612,7 +637,7 @@ function gutterMesh(level, theme) {
   lip.box(cx - reach, H - 14, D2, cx - half - WALL_T, H + 2, D2 + 3);
   lip.box(cx + half + WALL_T, H - 14, D2, cx + reach, H + 2, D2 + 3);
   g.add(new THREE.Mesh(lip.build(1), plain('zincEdge', {})));
-  const bead = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, reach * 2, 12), zinc);
+  const bead = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, reach * 2, 12), beadMat);
   bead.rotation.z = Math.PI / 2;
   bead.position.set(cx, H + 120, -D2 + 4);
   bead.castShadow = true;
