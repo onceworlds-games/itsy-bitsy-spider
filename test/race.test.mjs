@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rankRace, pointsFor, cupOrder, botSkills, startXs, createRace, stepBots, applyHazards } from '../game/race.js';
-import { POINTS } from '../game/config.js';
-import { packGhost, unpackGhost, createRecorder, record, ghostAt } from '../game/ghost.js';
-import { knock } from '../game/spider.js';
+import { rankRace, pointsFor, cupOrder, botSkills, startXs, createRace, stepBots, applyHazards } from '../src/sim/race.js';
+import { POINTS } from '../src/sim/config.js';
+import { packGhost, unpackGhost, createRecorder, record, ghostAt } from '../src/sim/ghost.js';
+import { knock } from '../src/sim/spider.js';
 
 test('finishers by time, the rest by height, ties share a place', () => {
   const ids = ['a', 'b', 'c', 'd', 'e'];

@@ -1,6 +1,7 @@
-// A spout's geometry: pieces stacked into one wall chain (right wall down, the drain's floor, left wall up, the gutter at both
-// ends), the path the spider's centre walks along (the chain pushed out by the spider's radius, with arcs round outside
-// corners), dry pockets, features and the queries the physics, bots and renderer need. Pure.
+// A spout's geometry: pieces stacked into one wall chain (right wall down, the drain's floor, left wall up), plus islands
+// (bars, twigs and leaves wedged across the pipe: closed loops you can walk all the way round). Every surface becomes a
+// path the spider's centre walks along (pushed out by its radius, with arcs round outside corners). Also: dry pockets,
+// snags for silk, flies, features, and the queries the physics, the bots and the renderer need. Pure.
 
 import { buildPiece } from './pieces.js';
 import { HALF, R, CATCH_NY } from './config.js';
@@ -17,6 +18,9 @@ export function buildLevel(pieces, opts = {}) {
   const features = [];
   const center = [];
   const spans = [];
+  const islands = [];
+  const snags = [];
+  const flies = [];
   const push = (list, pts) => {
     for (const p of pts) {
       const last = list[list.length - 1];
@@ -31,13 +35,16 @@ export function buildLevel(pieces, opts = {}) {
     push(center, built.center);
     for (const p of built.pockets) pockets.push(p);
     for (const f of built.features) features.push(f);
-    spans.push({ k: piece.k, y0: y, y1: y + built.h, cx, exit: built.exit, piece });
+    for (const isl of built.islands) islands.push(isl);
+    for (const s of built.snags) snags.push({ id: snags.length, ...s });
+    for (const f of built.flies) flies.push({ id: flies.length, ...f });
+    spans.push({ k: piece.k, y0: y, y1: y + built.h, cx, exit: built.exit, piece, half: built.half ?? HALF });
     cx = built.exit;
     y += built.h;
   }
   const top = pieces.length && pieces[pieces.length - 1].k === 'top' ? y : Infinity;
 
-  // One chain, free space on the right of travel: right wall top to bottom, the floor, left wall bottom to top.
+  // The main chain, free space on the right of travel: right wall top to bottom, the floor, left wall bottom to top.
   const chain = [];
   const sides = [];
   for (let i = right.length - 1; i >= 0; i--) {
@@ -48,29 +55,44 @@ export function buildLevel(pieces, opts = {}) {
     chain.push(left[i]);
     sides.push(left[i][1] >= top - 1e-6 && i === left.length - 1 ? 'G' : 'L');
   }
-  const path = offsetPath(chain, sides, R);
-  markMoss(path, features);
-  computeUp(path);
-  const index = buildIndex(path);
+  const paths = [offsetPath(chain, sides, R, false)];
+  for (const isl of islands) {
+    const poly = ccw(isl.poly);
+    isl.poly = poly;
+    isl.pi = paths.length;
+    paths.push(offsetPath(poly, poly.map(() => 'I'), R, true));
+  }
+  paths.forEach((p, i) => {
+    p.id = i;
+    markMoss(p, features);
+    computeUp(p);
+  });
+  const index = buildIndex(paths);
   const pocketBoxes = pockets.map((poly) => bbox(poly));
-  // Where the walking path passes through each dry pocket: bots aim for the middle of it.
+  // Where a walking path passes through each dry pocket: bots aim for the middle of it.
   const pocketAnchors = [];
   pockets.forEach((poly, k) => {
-    let run = null;
-    for (let i = 0; i <= path.n; i++) {
-      const inside = i < path.n && pointInPoly(poly, path.x[i], path.y[i]);
-      if (inside && !run) run = { a: path.cum[i], b: path.cum[i] };
-      else if (inside) run.b = path.cum[i];
-      else if (run) {
-        const s = (run.a + run.b) / 2;
-        const p = sampleAt(path, s, {});
-        pocketAnchors.push({ k, s, x: p.x, y: p.y, len: run.b - run.a });
-        run = null;
+    for (const path of paths) {
+      let run = null;
+      for (let i = 0; i <= path.n; i++) {
+        const inside = i < path.n && pointInPoly(poly, path.x[i], path.y[i]);
+        if (inside && !run) run = { a: path.cum[i], b: path.cum[i] };
+        else if (inside) run.b = path.cum[i];
+        else if (run) {
+          const s = (run.a + run.b) / 2;
+          const p = sampleAt(path, s, {});
+          pocketAnchors.push({ k, pi: path.id, s, x: p.x, y: p.y, len: run.b - run.a });
+          run = null;
+        }
       }
     }
   });
+  snags.sort((a, b) => a.y - b.y);
+  snags.forEach((s, i) => (s.id = i));
+  flies.sort((a, b) => a.y - b.y);
+  flies.forEach((f, i) => (f.id = i));
 
-  const level = {
+  return {
     pieces,
     H: Number.isFinite(top) ? top : y,
     height: y,
@@ -78,17 +100,20 @@ export function buildLevel(pieces, opts = {}) {
     left,
     right,
     chain,
-    path,
+    islands,
+    paths,
+    path: paths[0],
     pockets,
     pocketBoxes,
     pocketAnchors,
     features,
+    snags,
+    flies,
     center,
     spans,
     index,
     name: opts.name ?? '',
   };
-  return level;
 }
 
 function bbox(poly) {
@@ -105,13 +130,28 @@ function bbox(poly) {
   return { x0, y0, x1, y1 };
 }
 
-/** The path the spider's centre follows: the chain offset by r, arcs at outside corners, mitres at inside corners. */
-export function offsetPath(chain, sides, r) {
+/** Signed area (y up): positive when counter-clockwise. */
+export function signedArea(poly) {
+  let a = 0;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) a += (poly[j][0] - poly[i][0]) * (poly[j][1] + poly[i][1]);
+  return a / 2;
+}
+/** Counter-clockwise (y up), so the outside is on the right of travel. */
+const ccw = (poly) => (signedArea(poly) < 0 ? poly.slice().reverse() : poly.slice());
+
+/**
+ * The path the spider's centre follows: the chain offset by r on the right of travel, arcs at outside corners, mitres at
+ * inside corners. `closed` wraps the last point to the first (an island all the way round).
+ */
+export function offsetPath(chain, sides, r, closed = false) {
   const n = chain.length;
+  const segs = closed ? n : n - 1;
   const dirs = [];
-  for (let i = 0; i < n - 1; i++) {
-    const dx = chain[i + 1][0] - chain[i][0];
-    const dy = chain[i + 1][1] - chain[i][1];
+  for (let i = 0; i < segs; i++) {
+    const a = chain[i];
+    const b = chain[(i + 1) % n];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
     const len = Math.hypot(dx, dy) || 1;
     dirs.push([dx / len, dy / len]);
   }
@@ -136,15 +176,13 @@ export function offsetPath(chain, sides, r) {
   for (let j = 0; j < n; j++) {
     const [px, py] = chain[j];
     const sd = sides[j];
-    if (j === 0 || j === n - 1) {
+    if (!closed && (j === 0 || j === n - 1)) {
       const d = dirs[j === 0 ? 0 : n - 2];
-      const nx = d[1];
-      const ny = -d[0];
-      add(px + nx * r, py + ny * r, nx, ny, sd);
+      add(px + d[1] * r, py - d[0] * r, d[1], -d[0], sd);
       continue;
     }
-    const d1 = dirs[j - 1];
-    const d2 = dirs[j];
+    const d1 = dirs[(j - 1 + segs) % segs];
+    const d2 = dirs[j % segs];
     const n1 = [d1[1], -d1[0]];
     const n2 = [d2[1], -d2[0]];
     const cross = d1[0] * d2[1] - d1[1] * d2[0];
@@ -172,6 +210,16 @@ export function offsetPath(chain, sides, r) {
       add(px + mx * k, py + my * k, mx / ml, my / ml, sd);
     }
   }
+  if (closed && xs.length > 1) {
+    // Close the loop: repeat the first point so the last segment leads back to it.
+    if (Math.abs(xs[0] - xs[xs.length - 1]) > 0.01 || Math.abs(ys[0] - ys[ys.length - 1]) > 0.01) {
+      xs.push(xs[0]);
+      ys.push(ys[0]);
+      nxs.push(nxs[0]);
+      nys.push(nys[0]);
+      side.push(side[0]);
+    }
+  }
   const count = xs.length;
   const cum = new Float64Array(count);
   for (let i = 1; i < count; i++) cum[i] = cum[i - 1] + Math.hypot(xs[i] - xs[i - 1], ys[i] - ys[i - 1]);
@@ -186,6 +234,8 @@ export function offsetPath(chain, sides, r) {
     sny[i] = -dx / l;
   }
   return {
+    id: 0,
+    closed,
     snx,
     sny,
     mossPatches: [],
@@ -202,7 +252,7 @@ export function offsetPath(chain, sides, r) {
 }
 
 function markMoss(path, features) {
-  path.mossPatches = features.filter((f) => f.kind === 'moss').map((f) => ({ side: f.side, y0: f.y0, y1: f.y1 }));
+  path.mossPatches = path.id === 0 ? features.filter((f) => f.kind === 'moss').map((f) => ({ side: f.side, y0: f.y0, y1: f.y1 })) : [];
 }
 
 /** Moss under a wall point (moss only grows on the walls themselves, not on ledges). */
@@ -212,48 +262,72 @@ export function mossAt(path, side, y, snx) {
   return 0;
 }
 
-/** For every path point: which way along the path gains height sooner (+1 forward, -1 back). */
+/** For every path point: which way along the path gains height sooner (+1 forward, -1 back, 0 neither: a top). */
 function computeUp(path) {
-  const { n, y, cum, up } = path;
-  const RISE = 40;
+  const { n, y, cum, up, closed, length } = path;
+  const RISE = 30;
   const LIMIT = 900;
+  const m = n - 1; // a closed path repeats its first point at the end
   for (let i = 0; i < n; i++) {
     let fwd = Infinity;
-    for (let j = i + 1; j < n && cum[j] - cum[i] < LIMIT; j++) {
-      if (y[j] > y[i] + RISE) {
-        fwd = cum[j] - cum[i];
-        break;
-      }
-    }
     let back = Infinity;
-    for (let j = i - 1; j >= 0 && cum[i] - cum[j] < LIMIT; j--) {
+    for (let k = 1; k < n * 2; k++) {
+      const j = closed ? (i + k) % m : i + k;
+      if (!closed && j >= n) break;
+      const d = closed ? ((((cum[j] - cum[i]) % length) + length) % length) || length : cum[j] - cum[i];
+      if (d > LIMIT) break;
       if (y[j] > y[i] + RISE) {
-        back = cum[i] - cum[j];
+        fwd = d;
         break;
       }
     }
-    if (fwd === Infinity && back === Infinity) up[i] = path.side[i] === 'R' ? -1 : 1;
+    for (let k = 1; k < n * 2; k++) {
+      const j = closed ? (((i - k) % m) + m) % m : i - k;
+      if (!closed && j < 0) break;
+      const d = closed ? ((((cum[i] - cum[j]) % length) + length) % length) || length : cum[i] - cum[j];
+      if (d > LIMIT) break;
+      if (y[j] > y[i] + RISE) {
+        back = d;
+        break;
+      }
+    }
+    if (fwd === Infinity && back === Infinity) up[i] = closed ? 0 : path.side[i] === 'R' ? -1 : 1;
     else up[i] = fwd <= back ? 1 : -1;
   }
 }
 
-function buildIndex(path) {
+/** One bucketed index over every segment of every path: a segment's global id g → (path, segment). */
+function buildIndex(paths) {
+  const segPath = [];
+  const segIdx = [];
   const buckets = new Map();
-  for (let i = 0; i < path.n - 1; i++) {
-    const lo = Math.floor((Math.min(path.y[i], path.y[i + 1]) - 2) / BUCKET);
-    const hi = Math.floor((Math.max(path.y[i], path.y[i + 1]) + 2) / BUCKET);
-    for (let b = lo; b <= hi; b++) {
-      let list = buckets.get(b);
-      if (!list) buckets.set(b, (list = []));
-      list.push(i);
+  for (const path of paths) {
+    for (let i = 0; i < path.n - 1; i++) {
+      const g = segPath.length;
+      segPath.push(path.id);
+      segIdx.push(i);
+      const lo = Math.floor((Math.min(path.y[i], path.y[i + 1]) - 2) / BUCKET);
+      const hi = Math.floor((Math.max(path.y[i], path.y[i + 1]) + 2) / BUCKET);
+      for (let b = lo; b <= hi; b++) {
+        let list = buckets.get(b);
+        if (!list) buckets.set(b, (list = []));
+        list.push(g);
+      }
     }
   }
-  return { buckets, stamp: new Uint32Array(path.n), mark: 1 };
+  return { buckets, segPath: Int32Array.from(segPath), segIdx: Int32Array.from(segIdx), stamp: new Uint32Array(segPath.length), mark: 1 };
 }
 
-/** The point on the path at arclength s: { x, y, nx, ny, i (segment), up, moss }. Writes into `out` when given. */
+/** Wraps an arclength onto a path (closed paths go round, open ones clamp). */
+export function wrapS(path, s) {
+  if (path.closed) return ((s % path.length) + path.length) % path.length;
+  return s < 0 ? 0 : s > path.length ? path.length : s;
+}
+
+/** The point on the path at arclength s: { x, y, nx, ny, i (segment), up, moss, side }. Writes into `out` when given. */
 export function sampleAt(path, s, out = {}) {
   const { cum, n } = path;
+  if (path.closed) s = wrapS(path, s);
   if (s <= 0) return fill(out, path, 0, 0);
   if (s >= path.length) return fill(out, path, n - 2, 1);
   let lo = 0;
@@ -283,11 +357,13 @@ function fill(out, path, i, f) {
 }
 
 /**
- * The first place the segment (x0,y0)→(x1,y1) crosses the path, or null: { t (0..1 along the move), s, x, y, nx, ny, i }.
- * `skipFrom`/`skipTo` leave out a stretch of arclength (the surface a jump just left).
+ * The first place the segment (x0,y0)→(x1,y1) crosses any path from its free side, or null:
+ * { t (0..1 along the move), pi (path), s, x, y, nx, ny, i }. `skip` ({ pi, s0, s1, nx, ny }) leaves out the face a jump
+ * just left: segments of that path within that stretch of arclength facing the same way (a wall round the next inside
+ * corner still catches you).
  */
-export function raycast(level, x0, y0, x1, y1, skipFrom = -1, skipTo = -1) {
-  const { path, index } = level;
+export function raycast(level, x0, y0, x1, y1, skip = null) {
+  const { paths, index } = level;
   const lo = Math.floor((Math.min(y0, y1) - 2) / BUCKET);
   const hi = Math.floor((Math.max(y0, y1) + 2) / BUCKET);
   index.mark = (index.mark + 1) >>> 0 || 1;
@@ -298,9 +374,11 @@ export function raycast(level, x0, y0, x1, y1, skipFrom = -1, skipTo = -1) {
   for (let b = lo; b <= hi; b++) {
     const list = index.buckets.get(b);
     if (!list) continue;
-    for (const i of list) {
-      if (index.stamp[i] === index.mark) continue;
-      index.stamp[i] = index.mark;
+    for (const g of list) {
+      if (index.stamp[g] === index.mark) continue;
+      index.stamp[g] = index.mark;
+      const path = paths[index.segPath[g]];
+      const i = index.segIdx[g];
       const ax = path.x[i];
       const ay = path.y[i];
       const sx = path.x[i + 1] - ax;
@@ -317,19 +395,24 @@ export function raycast(level, x0, y0, x1, y1, skipFrom = -1, skipTo = -1) {
       const ny = path.sny[i];
       if (rx * nx + ry * ny >= 0) continue;
       const s = path.cum[i] + (path.cum[i + 1] - path.cum[i]) * u;
-      if (skipFrom >= 0 && s >= skipFrom && s <= skipTo) continue;
+      if (skip && path.id === skip.pi && s >= skip.s0 && s <= skip.s1 && nx * skip.nx + ny * skip.ny > 0.5) continue;
       if (t < bestT) {
         bestT = t;
-        best = { t, s, x: ax + sx * u, y: ay + sy * u, nx, ny, i };
+        best = { t, pi: path.id, s, x: ax + sx * u, y: ay + sy * u, nx, ny, i };
       }
     }
   }
   return best;
 }
 
-/** Nearest path point to (x, y) within `max` units: { s, x, y, d } or null. */
+/** Is the straight line between two points clear of every surface? (silk's line of sight) */
+export function clearLine(level, x0, y0, x1, y1) {
+  return !raycast(level, x0, y0, x1, y1);
+}
+
+/** Nearest path point to (x, y) within `max` units: { pi, s, x, y, d } or null. */
 export function nearest(level, x, y, max = 40) {
-  const { path, index } = level;
+  const { paths, index } = level;
   const lo = Math.floor((y - max) / BUCKET);
   const hi = Math.floor((y + max) / BUCKET);
   index.mark = (index.mark + 1) >>> 0 || 1;
@@ -337,9 +420,11 @@ export function nearest(level, x, y, max = 40) {
   for (let b = lo; b <= hi; b++) {
     const list = index.buckets.get(b);
     if (!list) continue;
-    for (const i of list) {
-      if (index.stamp[i] === index.mark) continue;
-      index.stamp[i] = index.mark;
+    for (const g of list) {
+      if (index.stamp[g] === index.mark) continue;
+      index.stamp[g] = index.mark;
+      const path = paths[index.segPath[g]];
+      const i = index.segIdx[g];
       const ax = path.x[i];
       const ay = path.y[i];
       const sx = path.x[i + 1] - ax;
@@ -349,7 +434,7 @@ export function nearest(level, x, y, max = 40) {
       const px = ax + sx * u;
       const py = ay + sy * u;
       const d = Math.hypot(px - x, py - y);
-      if (d <= max && (!best || d < best.d)) best = { s: path.cum[i] + (path.cum[i + 1] - path.cum[i]) * u, x: px, y: py, d };
+      if (d <= max && (!best || d < best.d)) best = { pi: path.id, s: path.cum[i] + (path.cum[i + 1] - path.cum[i]) * u, x: px, y: py, d };
     }
   }
   return best;
@@ -391,8 +476,30 @@ export function centerX(level, y) {
   return c[lo][0] + ((c[hi][0] - c[lo][0]) * (y - c[lo][1])) / dy;
 }
 
+/** The pipe's half-width at height y (wider in a hopper). */
+export function halfAt(level, y) {
+  const spans = level.spans;
+  let lo = 0;
+  let hi = spans.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (spans[mid].y0 <= y) lo = mid;
+    else hi = mid - 1;
+  }
+  const sp = spans[lo];
+  if (!sp || sp.k !== 'hopper') return HALF;
+  const p = sp.piece;
+  const w = p.w ?? 230;
+  const flare = w - HALF;
+  const yy = y - sp.y0;
+  const inner = p.h ?? 420;
+  if (yy < flare) return HALF + Math.max(0, yy);
+  if (yy < flare + inner) return w;
+  return Math.max(HALF, w - (yy - flare - inner));
+}
+
 /** Inner wall x at height y (rings and brackets ignored). */
-export const wallX = (level, side, y) => centerX(level, y) + (side === 'L' ? -HALF : HALF);
+export const wallX = (level, side, y) => centerX(level, y) + (side === 'L' ? -halfAt(level, y) : halfAt(level, y));
 
 /** Is this path point a ledge that catches a washed spider? */
 export const isCatch = (ny) => ny > CATCH_NY;
@@ -407,4 +514,16 @@ export function featuresIn(level, kind, y0, y1) {
     if (b >= y0 && a <= y1) out.push(f);
   }
   return out;
+}
+
+/** First index in a y-sorted list with item.y >= y. */
+export function lowerBound(list, y) {
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (list[mid].y < y) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
 }

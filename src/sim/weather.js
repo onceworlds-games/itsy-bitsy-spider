@@ -3,8 +3,8 @@
 // at the same moment.
 
 import { makeRng } from './rng.js';
-import { FRONT_SPEED, WARN, WARN_LONG, DEBRIS_SPEED, BIRD_CYCLE, BIRD_REACH, VENT_H, HALF } from './config.js';
-import { inPocket, centerX, wallX } from './level.js';
+import { FRONT_SPEED, WARN, WARN_LONG, DEBRIS_SPEED, BIRD_CYCLE, BIRD_REACH, VENT_H } from './config.js';
+import { inPocket, centerX, wallX, halfAt } from './level.js';
 
 export const DOUBLE_PARTS = [
   [0, 1.2],
@@ -148,7 +148,7 @@ export function inLift(level, x, y) {
   for (const f of level.features) {
     if (f.kind !== 'vent') continue;
     if (y < f.y || y > f.y + VENT_H) continue;
-    if (Math.abs(x - centerX(level, y)) <= HALF) return true;
+    if (Math.abs(x - centerX(level, y)) <= halfAt(level, y)) return true;
   }
   return false;
 }

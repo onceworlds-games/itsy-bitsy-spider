@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeWeather, rainAt, arrival, makeWorld, birdAt, pecked, debrisIn, SURGE, GENTLE_FLUSH } from '../game/weather.js';
-import { SPOUTS } from '../game/spouts.js';
-import { levelFor, weatherFor } from '../game/race.js';
-import { GRIP_MAX, FRONT_SPEED, WARN } from '../game/config.js';
-import { inPocket, centerX } from '../game/level.js';
+import { makeWeather, rainAt, arrival, makeWorld, birdAt, pecked, debrisIn, SURGE, GENTLE_FLUSH } from '../src/sim/weather.js';
+import { SPOUTS } from '../src/sim/spouts.js';
+import { levelFor, weatherFor } from '../src/sim/race.js';
+import { GRIP_MAX, FRONT_SPEED, WARN } from '../src/sim/config.js';
+import { inPocket, centerX } from '../src/sim/level.js';
 
 test('the same seed gives the same rain on every page', () => {
   const a = weatherFor(7, 1234);

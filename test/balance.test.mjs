@@ -1,9 +1,9 @@
 // Balance: the numbers in DESIGN.md hold when bots play whole races and cups.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { simulateRace, botSkills, rankRace, pointsFor, cupOrder } from '../game/race.js';
-import { SPOUTS, CUPS, STAR_TIMES, starsFor } from '../game/spouts.js';
-import { BOT_NAMES } from '../game/bot.js';
+import { simulateRace, botSkills, rankRace, pointsFor, cupOrder } from '../src/sim/race.js';
+import { SPOUTS, CUPS, STAR_TIMES, starsFor } from '../src/sim/spouts.js';
+import { BOT_NAMES } from '../src/sim/bot.js';
 
 const median = (list) => {
   const a = list.slice().sort((x, y) => x - y);

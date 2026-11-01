@@ -4,13 +4,13 @@
 // bumps are applied by the page of the spider that was bumped. Everything read from the room is checked first.
 // Also: a stand-in for the SDK and a local match for when the page runs without the platform (posters, a plain server).
 
-import { createRun, advance, restoreRacer, heightOf } from './run.js';
-import { pack, knock, bumpVelocity, modeName, modeCode, angleOf } from './spider.js';
-import { CUPS, cupById } from './spouts.js';
-import { POINTS, CLOSE_AFTER, ROUND_CAP, STEP } from './config.js';
-import { rankRace, botSkills, pointsFor, cupOrder } from './race.js';
-import { hashString } from './rng.js';
-import { BOT_NAMES } from './bot.js';
+import { createRun, advance, restoreRacer, heightOf } from './sim/run.js';
+import { pack, knock, bumpVelocity, modeName, modeCode, angleOf } from './sim/spider.js';
+import { CUPS, cupById } from './sim/spouts.js';
+import { POINTS, CLOSE_AFTER, ROUND_CAP, STEP } from './sim/config.js';
+import { rankRace, botSkills, pointsFor, cupOrder } from './sim/race.js';
+import { hashString } from './sim/rng.js';
+import { BOT_NAMES } from './sim/bot.js';
 
 export const SETTINGS = [
   { id: 'cup', label: 'Cup', options: CUPS.map((c) => ({ value: c.id, label: c.name })), default: 1 },

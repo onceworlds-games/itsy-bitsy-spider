@@ -1,25 +1,46 @@
 // The numbers the game runs on (DESIGN.md, "Balance and timing"). World units: y points up; 100 units = 1 m.
 
-export const PIPE_W = 170; // free width between the walls
-export const WALL_T = 22; // how thick the cut zinc wall is drawn
+export const PIPE_W = 200; // free width between the walls
+export const WALL_T = 18; // how thick the cut zinc wall is
 export const HALF = PIPE_W / 2;
+export const DEPTH = 130; // how deep the cut-open pipe is (front edge to back plate), for the picture
 export const RING_IN = 14; // how far a joint collar sticks into the pipe
 export const RING_H = 16;
 
-export const R = 12; // the spider's collision radius (body drawn at ~13)
-export const WALK = 140;
-export const ACCEL = 1750; // full speed in 0.08 s
-export const JUMP = 520;
-export const GRAVITY = 820;
-export const MAX_FALL = 700;
-export const JUMP_BUFFER = 0.1;
+export const R = 12; // the spider's collision radius
+export const WALK = 150; // first steps
+export const SCURRY = 215; // after running the same way for SCURRY_T
+export const SCURRY_T = 0.55;
+export const ACCEL = 1900;
+export const TURN_DECEL = 3200;
+export const JUMP = 600;
+export const GRAVITY = 1000;
+export const JUMP_CUT = 2.4; // gravity multiplier while rising with Jump let go
+export const CARRY = 0.6; // share of the running speed a jump keeps
+export const MAX_FALL = 820;
+export const JUMP_BUFFER = 0.12;
 export const DEPART_IGNORE = 0.06;
+
+export const SILK_RANGE = 250; // how far silk reaches to a snag
+export const SILK_MIN = 34; // the shortest the thread reels to
+export const SILK_REEL = 190; // how fast it reels in while held
+export const SILK_PUMP = 520; // the stick swinging you along the arc
+export const SILK_FLING = 1.12; // letting go
+export const SILK_MAXV = 880;
+export const SILK_COOLDOWN = 0.25;
 
 export const GRIP_MAX = 3;
 export const GRIP_MIN_START = 0.2;
 export const GRIP_REFILL_DELAY = 0.3;
+export const PERFECT = 0.25; // Hold this close before the water arrives: the flush costs no grip, and a spring after
+export const LATE_GRACE = 0.07; // a hold this soon after the water touched you still counts
+export const SPRING_T = 1.2;
+export const SPRING_K = 1.35;
+export const FLY_T = 0.5;
+export const FLY_K = 1.2;
+export const FLY_R = 26;
 
-export const FRONT_SPEED = 1800; // the flush's front and tail travel down the pipe
+export const FRONT_SPEED = 900; // the flush's front and tail travel down the pipe
 export const WARN = 2;
 export const WARN_LONG = 3;
 export const WASH_SPEED = 600;
@@ -38,8 +59,8 @@ export const BIRD_CYCLE = 3.2;
 export const BIRD_REACH = 70;
 export const MOSS_SLIDE = 40;
 export const VENT_H = 400;
-export const VENT_ACCEL = 1400;
-export const VENT_MAX = 300;
+export const VENT_ACCEL = 1500;
+export const VENT_MAX = 320;
 
 export const STEP = 1 / 120;
 export const POINTS = [10, 7, 5, 3, 2, 1];

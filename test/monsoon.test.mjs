@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMonsoon, monsoonPieces, dayKey, daySeed, floodSpeed, MONSOON_TOP } from '../game/monsoon.js';
-import { buildLevel, inPocket } from '../game/level.js';
-import { createSpider, step, startS } from '../game/spider.js';
-import { createBrain, think } from '../game/bot.js';
-import { applyHazards } from '../game/race.js';
+import { createMonsoon, monsoonPieces, dayKey, daySeed, floodSpeed, MONSOON_TOP } from '../src/sim/monsoon.js';
+import { buildLevel, inPocket } from '../src/sim/level.js';
+import { createSpider, step, startS } from '../src/sim/spider.js';
+import { createBrain, think } from '../src/sim/bot.js';
+import { applyHazards } from '../src/sim/race.js';
 
 test('today is one spout for everyone', () => {
   assert.equal(dayKey(Date.UTC(2026, 10, 1, 23, 59)), '2026-11-01');

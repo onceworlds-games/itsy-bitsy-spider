@@ -2,18 +2,18 @@
 // are simulated here at the fixed step; spiders from the network only carry a drawing state. Used by the title's attract
 // race, the lobby, solo spouts, Monsoon and online races. Pure: no page.
 
-import { STEP, SEAT_LOOKS } from './config.js';
-import { createSpider, step, startS, knock, bumpVelocity, angleOf, unpack } from './spider.js';
+import { STEP, SEAT_LOOKS, FLY_R } from './config.js';
+import { createSpider, step, startS, knock, bumpVelocity, angleOf, unpack, eatFly, modeCode } from './spider.js';
 import { createBrain, think } from './bot.js';
-import { startXs, levelFor, weatherFor, applyHazards } from './race.js';
+import { startXs, levelFor, weatherFor, applyHazards } from './course.js';
 import { makeWorld } from './weather.js';
 import { spoutById } from './spouts.js';
 import { createMonsoon } from './monsoon.js';
 import { createRecorder, record } from './ghost.js';
-import { modeCode } from './spider.js';
+import { lowerBound } from './level.js';
 
 /**
- * opts: { kind, spout, seed, seats: [{ id, name, bot, skill, me, index }], monsoonSeed, simBots (default true) }
+ * opts: { kind, spout, seed, seats: [{ id, name, bot, skill, me, index, look }], monsoonSeed, simBots (default true) }
  * Seats are in start order (their index picks the start position).
  */
 export function createRun(opts) {
@@ -25,7 +25,7 @@ export function createRun(opts) {
     mon = createMonsoon(opts.monsoonSeed ?? 1);
     level = mon.level;
     weather = mon.weather;
-    def = { id: 0, name: 'Monsoon', facade: MONSOON_FACADE, lightning: true };
+    def = { id: 0, name: 'Monsoon', theme: 'monsoon', lightning: true };
   } else {
     def = spoutById(opts.spout ?? 1);
     level = levelFor(def.id);
@@ -61,19 +61,20 @@ export function createRun(opts) {
       me: !!seat.me,
       skill: seat.skill ?? 0.5,
       index: seat.index ?? i,
-      look: SEAT_LOOKS[(seat.index ?? i) % SEAT_LOOKS.length],
+      look: seat.look ?? SEAT_LOOKS[(seat.index ?? i) % SEAT_LOOKS.length],
       sp: seat.me || seat.bot ? createSpider(level, s) : null,
       brain: seat.bot ? createBrain(seat.name, seat.skill ?? 0.5, `${run.seed}:${seat.id}`) : null,
       memo: { debris: -1, bird: 0 },
+      ate: new Uint8Array(level.flies.length),
       finish: 0,
-      st: { x: 0, y: 0, a: 0, m: 'surf', g: 3, h: false, f: 1 },
+      st: { x: 0, y: 0, a: 0, m: 'surf', g: 3, h: false, f: 1, k: -1, nx: 0, ny: 1 },
       away: false,
       left: false,
       startS: s,
     };
     // Until the network says otherwise, everyone stands at their start.
     const p = r.sp ?? createSpider(level, s);
-    Object.assign(r.st, { x: p.x, y: p.y, a: angleOf(p) });
+    Object.assign(r.st, { x: p.x, y: p.y, a: angleOf(p), nx: p.nx, ny: p.ny });
     run.racers.push(r);
     run.byId.set(r.id, r);
     if (r.me) run.me = r;
@@ -82,9 +83,6 @@ export function createRun(opts) {
   syncAll(run);
   return run;
 }
-
-// Monsoon's house: a tall block of flats, many windows lit.
-const MONSOON_FACADE = { kind: 'brick', base: '#6A3A2E', line: '#B9A898', window: { w: 90, h: 120, every: 480, light: '#FFC97A' }, trim: '#D9D0C2' };
 
 function sync(run, r) {
   // Spiders this page doesn't run (other players, bots on a page that isn't the host) take their state from the network.
@@ -98,6 +96,9 @@ function sync(run, r) {
   st.g = sp.grip;
   st.h = sp.holding;
   st.f = sp.facing;
+  st.k = sp.mode === 'swing' ? sp.snag : -1;
+  st.nx = sp.nx;
+  st.ny = sp.ny;
 }
 
 export function syncAll(run) {
@@ -116,8 +117,9 @@ export function restoreRacer(run, r, packed) {
 }
 
 /**
- * Steps the simulation from run.t up to `target` seconds (fixed steps). input: the local player's { x, y, jump, hold }
- * (jump is consumed by the first step). hooks: { onFinish(r), onBump(from, to, vx, vy), onDrown(r), onHazard(r, kind) }.
+ * Steps the simulation from run.t up to `target` seconds (fixed steps). input: the local player's
+ * { x, y, jump, jumpHeld, hold } (jump is consumed by the first step). hooks: { onFinish(r), onBump(from, to, vx, vy),
+ * onDrown(r), onHazard(r, kind), onFly(r, fly), onStep(run) }.
  */
 export function advance(run, target, input, hooks = {}) {
   let n = 0;
@@ -127,12 +129,14 @@ export function advance(run, target, input, hooks = {}) {
     if (input) input.jump = false;
     run.t += STEP;
     n++;
+    if (hooks.onStep) hooks.onStep(run);
   }
   syncAll(run);
   return n;
 }
 
-function stepOnce(run, input, hooks) {
+/** One fixed step of everything this page simulates. */
+export function stepOnce(run, input, hooks = {}) {
   const { level, world, weather } = run;
   const t = run.t;
   if (run.mon) run.mon.advance(t, STEP, run.me?.sp ? Math.max(run.best, run.me.sp.y) : run.best);
@@ -142,12 +146,13 @@ function stepOnce(run, input, hooks) {
       if (!input) continue;
     } else if (!r.bot || !run.simBots) continue;
     const sp = r.sp;
-    const wasAir = sp.mode === 'air';
-    const inp = r.me ? input : think(r.brain, sp, level, weather, t, STEP, run.seed);
+    const wasAir = sp.mode === 'air' || sp.mode === 'swing';
+    const inp = r.me ? input : think(r.brain, sp, level, weather, t, STEP, run.seed, world);
     step(sp, level, world, inp, t, STEP);
     const hit = applyHazards(sp, level, weather, t, run.seed, r.memo);
     if (hit && hooks.onHazard) hooks.onHazard(r, hit);
     if (wasAir || sp.mode === 'air') bumps(run, r, hooks);
+    flies(run, r, hooks);
     if (sp.mode === 'done' && !r.finish) {
       r.finish = t + STEP;
       if (!run.firstFinish) run.firstFinish = r.finish;
@@ -164,6 +169,22 @@ function stepOnce(run, input, hooks) {
         if (hooks.onDrown) hooks.onDrown(r);
       }
     }
+  }
+}
+
+/** Flies this spider touches: eaten (its own; everyone has their own flies to catch). */
+function flies(run, r, hooks) {
+  const fl = run.level.flies;
+  if (!fl.length) return;
+  const sp = r.sp;
+  if (sp.mode === 'washed' || sp.mode === 'dazed' || sp.mode === 'done' || sp.mode === 'drowned') return;
+  for (let i = lowerBound(fl, sp.y - FLY_R); i < fl.length && fl[i].y <= sp.y + FLY_R; i++) {
+    const f = fl[i];
+    if (r.ate[f.id]) continue;
+    if (Math.hypot(f.x - sp.x, f.y - sp.y) > FLY_R) continue;
+    r.ate[f.id] = 1;
+    eatFly(sp, f.gold);
+    if (hooks.onFly) hooks.onFly(r, f);
   }
 }
 

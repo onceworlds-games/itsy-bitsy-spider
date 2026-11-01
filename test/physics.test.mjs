@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildLevel, sampleAt } from '../game/level.js';
-import { createSpider, step, startS, knock, placeOn, pack, unpack } from '../game/spider.js';
-import { makeWorld } from '../game/weather.js';
-import { GRIP_MAX, HALF, R, FRONT_SPEED } from '../game/config.js';
+import { buildLevel, sampleAt } from '../src/sim/level.js';
+import { createSpider, step, startS, knock, placeOn, pack, unpack } from '../src/sim/spider.js';
+import { makeWorld } from '../src/sim/weather.js';
+import { GRIP_MAX, HALF, R, FRONT_SPEED } from '../src/sim/config.js';
 
 const dt = 1 / 120;
 const L = buildLevel([{ k: 'start' }, { k: 'straight', h: 1600, gap: 400 }, { k: 'straight', h: 600, moss: [{ side: 'L', y0: 100, y1: 400 }], gap: 0 }, { k: 'top' }]);

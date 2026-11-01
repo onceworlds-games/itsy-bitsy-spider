@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SPOUTS, CUPS } from '../game/spouts.js';
-import { buildLevel, sampleAt, inPocket, centerX, raycast } from '../game/level.js';
-import { createSpider, step, startS } from '../game/spider.js';
-import { HALF, R } from '../game/config.js';
+import { SPOUTS, CUPS } from '../src/sim/spouts.js';
+import { buildLevel, sampleAt, inPocket, centerX, raycast } from '../src/sim/level.js';
+import { createSpider, step, startS } from '../src/sim/spider.js';
+import { HALF, R } from '../src/sim/config.js';
 
 const dry = { water: () => null, wetRaw: () => false, lift: () => false };
 

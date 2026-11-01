@@ -1,9 +1,9 @@
 // The race layer through a fake room: several pages sharing presence, host state, messages and the host's finish rpc.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createNet, readPresence, validBots, validRound, roundSeed, roundInfo, cupRules, seatSkills } from '../game/net.js';
-import { placeOn } from '../game/spider.js';
-import { CLOSE_AFTER } from '../game/config.js';
+import { createNet, readPresence, validBots, validRound, roundSeed, roundInfo, cupRules, seatSkills } from '../src/net.js';
+import { placeOn } from '../src/sim/spider.js';
+import { CLOSE_AFTER } from '../src/sim/config.js';
 
 const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 
