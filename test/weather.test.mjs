@@ -53,9 +53,9 @@ test('water reaches the top first and travels down the pipe', () => {
   const top = wave.top;
   assert.equal(arrival(wave, top), wave.t0);
   assert.ok(Math.abs(arrival(wave, top - FRONT_SPEED) - (wave.t0 + 1)) < 1e-9);
-  const r = rainAt(w, top - 900, wave.t0 + 0.5 + 0.1, {});
+  const r = rainAt(w, top - FRONT_SPEED / 2, wave.t0 + 0.5 + 0.1, {});
   assert.equal(r.wet, true);
-  const before = rainAt(w, top - 900, wave.t0 + 0.4, {});
+  const before = rainAt(w, top - FRONT_SPEED / 2, wave.t0 + 0.4, {});
   assert.equal(before.wet, false);
   assert.ok(before.warn === wave && before.next > 0 && before.next < 0.2);
   // Above the gutter there is no water.

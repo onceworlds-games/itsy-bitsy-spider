@@ -1,8 +1,8 @@
 // The race layer through a fake room: several pages sharing presence, host state, messages and the host's finish rpc.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createNet, readPresence, validBots, validRound, roundSeed, roundInfo, cupRules, seatSkills } from '../src/net.js';
-import { placeOn } from '../src/sim/spider.js';
+import { createNet, readPresence, readLook, packLook, validBots, validRound, roundSeed, roundInfo, cupRules, seatSkills } from '../src/net.js';
+import { placeOn, modeCode } from '../src/sim/spider.js';
 import { CLOSE_AFTER } from '../src/sim/config.js';
 
 const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
@@ -147,8 +147,9 @@ test('every page sees the others: players from presence, bots from the host 150 
   const ra = a.net.round.run;
   const rb = b.net.round.run;
   // B as A sees it, and the other way round.
-  assert.ok(Math.abs(ra.byId.get('B').st.y - rb.me.sp.y) < 10);
-  assert.ok(Math.abs(rb.byId.get('A').st.y - ra.me.sp.y) < 10);
+  // (presence goes out 20 times a second: at most one send behind)
+  assert.ok(Math.abs(ra.byId.get('B').st.y - rb.me.sp.y) < 45);
+  assert.ok(Math.abs(rb.byId.get('A').st.y - ra.me.sp.y) < 45);
   // Bots: simulated on A (the host), interpolated on B.
   assert.equal(ra.simBots, true);
   assert.equal(rb.simBots, false);
@@ -273,22 +274,46 @@ test('bumps are applied only from someone close, once a second, and never forged
 });
 
 test('presence, snapshots and round data are checked before use', () => {
-  const level = { H: 5000 };
+  const level = { H: 5000, snags: [{ x: 0, y: 300 }, { x: 0, y: 600 }] };
   const ok = { v: 1, r: 'x', x: 10, y: 200, a: 90, m: 0, g: 30, h: 1, f: -1, d: 0 };
-  assert.deepEqual(readPresence(ok, 'x', level), { x: 10, y: 200, a: 90, m: 'surf', g: 3, h: true, f: -1, d: 0 });
-  for (const bad of [null, [], { ...ok, v: 2 }, { ...ok, r: 'y' }, { ...ok, x: NaN }, { ...ok, y: 1e9 }, { ...ok, m: 9 }, { ...ok, g: 'x' }, { ...ok, f: 3 }]) {
+  const st = readPresence(ok, 'x', level);
+  assert.deepEqual({ ...st, nx: Math.round(st.nx), ny: Math.round(st.ny) }, { x: 10, y: 200, a: 90, m: 'surf', g: 3, h: true, f: -1, k: -1, nx: 1, ny: 0, d: 0 });
+  for (const bad of [null, [], { ...ok, v: 2 }, { ...ok, r: 'y' }, { ...ok, x: NaN }, { ...ok, y: 1e9 }, { ...ok, m: 99 }, { ...ok, m: -1 }, { ...ok, g: 'x' }, { ...ok, f: 3 }]) {
     assert.equal(readPresence(bad, 'x', level), null);
   }
-  const snap = { r: 'x', t: 100, b: [['bot:1', 0, 100, 0, 0, 30, 0, 1, 0]] };
+  // A swing names a real bolt, or it is drawn as a jump.
+  const swing = modeCode('swing');
+  assert.equal(readPresence({ ...ok, m: swing, k: 1 }, 'x', level).k, 1);
+  assert.equal(readPresence({ ...ok, m: swing, k: 1 }, 'x', level).m, 'swing');
+  for (const k of [7, -3, 0.5, '1', undefined]) {
+    const r = readPresence({ ...ok, m: swing, k }, 'x', level);
+    assert.equal(r.k, -1);
+    assert.equal(r.m, 'air');
+  }
+  assert.equal(readPresence({ ...ok, k: 1 }, 'x', level).k, -1, 'only a swing carries a bolt');
+  const snap = { r: 'x', t: 100, b: [['bot:1', 0, 100, 0, 0, 30, 0, 1, -1, 0]] };
   assert.ok(validBots(snap));
   assert.ok(validBots(null));
-  assert.ok(!validBots({ ...snap, b: [['bot:1', 0, 100, 0, 0, 30, 0, 1]] }));
-  assert.ok(!validBots({ ...snap, b: [['bot:1', 0, Infinity, 0, 0, 30, 0, 1, 0]] }));
+  assert.ok(!validBots({ ...snap, b: [['bot:1', 0, 100, 0, 0, 30, 0, 1, 0]] }));
+  assert.ok(!validBots({ ...snap, b: [['bot:1', 0, Infinity, 0, 0, 30, 0, 1, -1, 0]] }));
+  assert.ok(!validBots({ ...snap, b: [['bot:1', 0, 100, 0, 0, 30, 0, 1, 0.5, 0]] }));
+  assert.ok(!validBots({ ...snap, b: [['bot:1', 0, 100, 0, 99, 30, 0, 1, -1, 0]] }));
   assert.ok(!validBots({ ...snap, b: new Array(9).fill(snap.b[0]) }));
   assert.ok(validRound({ s: 3, seed: 5, fin: { a: 1000 } }));
   assert.ok(!validRound({ s: 13, seed: 5, fin: {} }));
   assert.ok(!validRound({ s: 3, seed: 5, fin: { a: -1 } }));
   assert.ok(!validRound({ s: 3, seed: 5, fin: [] }));
+});
+
+test('a look on presence: only ids from the wardrobe, packed and read back the same', () => {
+  const look = { species: 'jumper', colorId: 'gold', mark: 'ring', hat: 'none', trail: 'none', dance: 'wave' };
+  const back = readLook(packLook(look));
+  assert.ok(back);
+  for (const k of ['species', 'colorId', 'mark', 'hat', 'trail', 'dance']) assert.equal(back[k], look[k]);
+  assert.match(back.color, /^#[0-9a-f]{6}$/i);
+  for (const bad of [null, 5, '', 'a.b.c', 'jumper.gold.ring.none.none', 'jumper.gold.ring.none.none.wave.x', 'jumper.<b>.ring.none.none.wave', 'x'.repeat(200), 'jumper.gold.ring.none.none.__proto__', 'jumper.gold.ring.none.none.constructor', 'jumper.gold.none.none.none.wave']) {
+    assert.equal(readLook(bad), null, String(bad).slice(0, 30));
+  }
 });
 
 test('bots in a race get the cup skill range, the best seat the strongest', () => {

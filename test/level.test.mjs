@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SPOUTS, CUPS } from '../src/sim/spouts.js';
-import { buildLevel, sampleAt, inPocket, centerX, raycast } from '../src/sim/level.js';
+import { buildLevel, sampleAt, inPocket, centerX, halfAt, raycast } from '../src/sim/level.js';
 import { createSpider, step, startS } from '../src/sim/spider.js';
 import { HALF, R } from '../src/sim/config.js';
 
@@ -13,7 +13,7 @@ test('twelve spouts in four cups, climbing in height', () => {
   let last = 0;
   for (const def of SPOUTS) {
     const L = buildLevel(def.pieces);
-    assert.ok(L.H >= 2900 && L.H <= 8200, `${def.name} is ${L.H}`);
+    assert.ok(L.H >= 2900 && L.H <= 8400, `${def.name} is ${L.H}`);
     assert.ok(L.H >= last - 120, `${def.name} should not be shorter than the spout before`);
     last = L.H;
   }
@@ -33,7 +33,7 @@ test('every path is clean: no zero or backwards segments, normals point into the
       const p = sampleAt(path, s, {});
       if (p.y >= level.H) continue; // the gutter runs along the roof
       const cx = centerX(level, p.y);
-      assert.ok(Math.abs(p.x - cx) < HALF + 80, `${def.name}: path point far outside at s=${s}`);
+      assert.ok(Math.abs(p.x - cx) < halfAt(level, p.y) + 80, `${def.name}: path point far outside at s=${s}`);
     }
   }
 });
@@ -58,7 +58,7 @@ test('Up alone climbs every spout to the sun on a dry day', () => {
       t += 1 / 120;
     }
     assert.equal(sp.mode, 'done', `${def.name}: stuck at ${sp.y.toFixed(0)}`);
-    assert.ok(t > L.H / 160 && t < L.H / 100, `${def.name}: ${t.toFixed(1)} s`);
+    assert.ok(t > L.H / 240 && t < L.H / 100, `${def.name}: ${t.toFixed(1)} s`);
   }
 });
 

@@ -57,6 +57,7 @@ export const DEBRIS_SPEED = 520;
 export const DEBRIS_HIT = 21;
 export const BIRD_CYCLE = 3.2;
 export const BIRD_REACH = 70;
+export const BIRD_FLICK = 0.45; // extra seconds of sliding after the bird's peck
 export const MOSS_SLIDE = 40;
 export const VENT_H = 400;
 export const VENT_ACCEL = 1500;

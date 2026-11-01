@@ -45,9 +45,10 @@ test('every cup bot finishes every spout of its cup, races end in time, nothing 
 
 test('skill orders finishing times', () => {
   for (const def of SPOUTS) {
-    const weak = median(soloTimes(def.id, 0.25, 5));
-    const mid = median(soloTimes(def.id, 0.55, 5));
-    const sharp = median(soloTimes(def.id, 0.95, 5));
+    const mean = (l) => l.reduce((a, b) => a + b, 0) / l.length;
+    const weak = mean(soloTimes(def.id, 0.25, 9));
+    const mid = mean(soloTimes(def.id, 0.55, 9));
+    const sharp = mean(soloTimes(def.id, 0.95, 9));
     assert.ok(sharp <= mid + 2 && mid < weak, `${def.name}: ${sharp} / ${mid} / ${weak}`);
   }
 });

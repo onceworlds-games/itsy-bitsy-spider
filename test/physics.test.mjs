@@ -54,9 +54,9 @@ test('not holding: washed down until a ring catches you, then dazed until the wa
   const sp = onWall(1100);
   const world = flushAt(0, 2);
   const arrive = (L.H - 1100) / FRONT_SPEED;
-  run(sp, world, idle, 0, arrive + 0.05);
+  run(sp, world, idle, 0, arrive + 0.12);
   assert.equal(sp.mode, 'washed');
-  run(sp, world, idle, arrive + 0.05, arrive + 1.5);
+  run(sp, world, idle, arrive + 0.12, arrive + 1.5);
   assert.equal(sp.mode, 'dazed');
   // The ring below 1100 is at 160 + 800 = 960: caught on its top.
   assert.ok(sp.y > 960 && sp.y < 1000, `caught at ${sp.y}`);
@@ -95,9 +95,9 @@ test('moss: Hold does nothing and you slide down', () => {
 
 test('Up + Jump from the left wall lands on the right wall, higher', () => {
   const sp = onWall(700);
-  run(sp, dry, { x: 0, y: 1, jump: true, hold: false }, 0, dt);
+  run(sp, dry, { x: 0, y: 1, jump: true, jumpHeld: true, hold: false }, 0, dt);
   assert.equal(sp.mode, 'air');
-  run(sp, dry, idle, dt, 1.2);
+  run(sp, dry, { x: 0, y: 0, jump: false, jumpHeld: true, hold: false }, dt, 1.2);
   assert.equal(sp.mode, 'surf');
   assert.ok(sp.x > HALF - R - 1, `landed at x=${sp.x}`);
   assert.ok(sp.y > 700 + 90 && sp.y < 700 + 170, `landed at y=${sp.y}`);

@@ -683,7 +683,8 @@ export function knock(sp, vx, vy, kind) {
   sp.snag = -1;
   sp.vx = vx;
   sp.vy = vy;
-  sp.timer = 0;
+  // The bird flicks you right off the wall: a longer slide before the legs catch anything.
+  sp.timer = kind === 'bird' ? -C.BIRD_FLICK : 0;
   sp.immune = C.IMMUNE;
   sp.holding = false;
   sp.boost = 0;

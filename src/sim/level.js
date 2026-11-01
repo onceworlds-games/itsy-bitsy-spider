@@ -71,13 +71,17 @@ export function buildLevel(pieces, opts = {}) {
   const pocketBoxes = pockets.map((poly) => bbox(poly));
   // Where a walking path passes through each dry pocket: bots aim for the middle of it.
   const pocketAnchors = [];
+  const probe = {};
   pockets.forEach((poly, k) => {
     for (const path of paths) {
+      // Walk the path in short steps (a straight edge has no vertices in the middle to test).
       let run = null;
-      for (let i = 0; i <= path.n; i++) {
-        const inside = i < path.n && pointInPoly(poly, path.x[i], path.y[i]);
-        if (inside && !run) run = { a: path.cum[i], b: path.cum[i] };
-        else if (inside) run.b = path.cum[i];
+      const steps = Math.ceil(path.length / 4);
+      for (let i = 0; i <= steps + 1; i++) {
+        const s = Math.min(path.length, i * 4);
+        const inside = i <= steps && (sampleAt(path, s, probe), pointInPoly(poly, probe.x, probe.y));
+        if (inside && !run) run = { a: s, b: s };
+        else if (inside) run.b = s;
         else if (run) {
           const s = (run.a + run.b) / 2;
           const p = sampleAt(path, s, {});
