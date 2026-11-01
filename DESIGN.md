@@ -26,27 +26,31 @@ Store line: "Climb the waterspout. Hold on when the rain comes down. First to th
 That is the whole game. Everything else (moss, debris, a bird, warm-air vents, storm surges) is a spout feature that arrives
 one at a time, each obvious on sight.
 
-## The first 60 seconds
+## The first minute
 
 | Time | What happens | Hint (2-5 words, once) |
 |---|---|---|
 | 0 s | **Title.** Night rain on a brick house; the cutaway spout fills the screen; four spiders race up it (attract mode, real bots). A flush thunders down: three plant their legs, one tumbles down to the ring below. "Itsy Bitsy Spider" is stamped on a zinc sign hanging on two silk threads from the gutter; a big zinc **Play** tag hangs under it, swaying. | none |
 | 2 s | Tap Play (or Space/Enter): sound starts, the sign is pulled up on its threads. **First visit ever:** straight into Spout 1, Garden Shed, alone. Returning players: the lobby. | |
 | 2-4 s | Camera starts at the sun breaking over the gutter, sweeps down the spout to your spider on the bottom ring. | |
-| 4 s | Your control. | "Climb ↑" (phone: an arrow on the stick) until you've climbed 100 |
+| 4 s | Your control. | "Up to climb" (phone: "Push up to climb" with an arrow to the stick) |
 | 7 s | Sun beams through the seams, legs pattering. First warning: the sky darkens, drips streak down, a rumble, the drop in the corner swells (3 s this first time). | "Rain coming" |
-| 9 s | 0.7 s before the water reaches you: | "Hold J" / "Hold!" (Hold button pulses) |
+| 9 s | 0.7 s before the water reaches you: | "Hold J" (keys) / "Hold!" with an arrow to the Hold button (touch) |
 | 10 s | **The flush** (1.2 s this first time). Holding: legs splay flat, water sheets over you, a "thwip" and a little spray. Not holding: washed down 250 to the ring below, with a clang. | after a wash-out: "Hold when it hits" |
 | 11 s | The water passes, gold light floods back, birdsong. If still holding 0.6 s after: | "Let go to climb" |
 | 16 s | A bend in the pipe with a dry pocket under it; second warning. | "Dry spot" with an arrow to the pocket |
-| 24 s | A bracket across the pipe: walking around it is long, a jump past it is short. | "Space: jump" / "Jump" |
+| 24 s | A bracket across the pipe: walking around it is long, a jump past it is short. | "Space to jump" / "Tap Jump" with an arrow |
 | 30-40 s | Third wave, then out over the gutter lip into the sun: the spider pops onto the roof edge in gold light, fanfare, the time, stars pop in. Buttons: **Race** (main), Again. | |
-| 45 s | **Lobby**: your spider and five bots sit on the bottom ring, names on tags. Cup: Drizzle. | "Ready to race" pointing at the platform's Ready strip |
+| 45 s | **Lobby**: your spider and five bots sit on the bottom ring, names on tags. Cup: Drizzle. | "Ready to race" pointing at the platform's lobby bar |
 | 48 s | Ready: the race starts at once with bots (a lone player in a public server). The spout's flyover (sun to start), 3, 2, 1, GO. | |
 | 55 s+ | Racing five spiders up the Garden Shed, the first flush washes two of them past you. | |
 
 A player who skips everything still reads the goal from the flyover (the sun at the top) and the danger from the first
 flush (water + tumbling spiders).
+
+**Hints follow the device in hand** (the last input decides): keyboard hints name the key, touch hints name the on-screen
+button and point at it. Each shows once (Hold up to six times, and only again after a wash-out) and is remembered in the
+`hints` save.
 
 ## Controls
 
@@ -109,9 +113,10 @@ all twelve once; three-starring them is the long game.
 ### Monsoon (endless, today's spout)
 
 One endless spout per day, the same for everyone (seeded by the UTC date), built from the same piece library as the twelve.
-**The drain is blocked: the pipe floods from below.** The flood rises after 3 s, starting 300 below you, at
-60 + 0.5 per metre of flood height units/s (capped at 150). Waves quicken with height (period 10 s at 0 m to 6 s at 200 m;
-debris from 30 m, surges from 60 m, the bird from 80 m). The flood catching you ends the run; a wash-out near the flood is
+**The drain is blocked: the pipe floods from below.** The flood rises after 3 s, starting 3 m below the start, at
+70 units/s + 0.6 per metre of flood height (capped at 160, reached at 150 m). Waves quicken with height (calm 6-7 s at
+0 m down to 2.2-3 s at 200 m, flushes 1.4-1.7 s up to 2.3-2.5 s; vents from 10 m, moss from 20 m, debris and doubles from
+30 m, long drops from 40 m, surges from 60 m, the bird from 80 m). The flood catching you ends the run; a wash-out near the flood is
 how most runs end. Score: **height in metres** (100 units = 1 m). Leaderboard `monsoon` (best ever), today's best on the
 lobby tag. A beginner run lasts about a minute (~40 m), a good one four (~150 m), an expert one ten (~350 m+).
 
@@ -126,8 +131,8 @@ Settings (the host picks them in the game's lobby with `room.setSetting`, everyo
 to the better place in the last race). A cup takes 3-6 minutes.
 
 Built on `createMatch` / `createHost` / `createBots`:
-- `rounds: 3`, `introSeconds: 4` (the flyover and our own 3-2-1, so `countdown: 0`: one countdown on screen),
-  `roundSeconds: 240` (a hard cap that should never matter), `roundEndSeconds: 5`, `resultsSeconds: 20` (a private
+- `rounds: 3`, `introSeconds: 5` (2 s at the sun, the sweep down, then our own 3-2-1, so `countdown: 0`: one countdown on
+  screen), `roundSeconds: 240` (a hard cap that should never matter), `roundEndSeconds: 6`, `resultsSeconds: 20` (a private
   server's host can continue sooner), `points: [10, 7, 5, 3, 2, 1]`, `admit: 'round'`.
 - **Lobby and ready-up:** the game draws the lobby; the platform's bar does Ready/Start. Public: everyone readies, the room
   starts. Private: the host starts when `room.canStart`. Joining never starts anything.
@@ -145,15 +150,20 @@ Built on `createMatch` / `createHost` / `createBots`:
 
 | What | Who decides | How it travels |
 |---|---|---|
-| Your spider (move, jump, hold, wash, catch) | your page | presence, 20 Hz: `{ v, r, x, y, a, s, g, f }` (round id, position, angle, state, grip, finish ms), < 100 bytes |
+| Your spider (move, jump, hold, wash, catch) | your page | presence, 20 Hz: `{ v, r, x, y, a, m, g, h, f, d }` (version, round id, position, angle, mode, grip×10, holding, facing, finish ms), < 100 bytes |
 | Rain, debris, the bird | nobody: a pure function of (spout, `match.seed` + round, round time on the match clock) | computed on every page |
 | Water hitting a spider | that spider's page (bots: the host) | the resulting state shows in presence |
-| Bot spiders | the host's page, same simulation | `host:bots` state at 10 Hz: `{ r, t, b: [[id, x, y, a, s, g], ...] }`, interpolated 150 ms behind on other pages |
+| Bot spiders | the host's page, same simulation | `host:bots` state at 10 Hz: `{ r, t, b: [[id, x, y, a, mode, grip×10, holding, facing, finish ms], ...] }`, interpolated 150 ms behind on other pages |
 | A bump (a jump into a rival) | the jumper's page detects it on its view of the rival; the **bumped** page applies it to itself (bots: the host) after checking the bumper is near it and not rate-limited | `room.send({ t: 'bump', ... }, { to })` |
 | Finishing | your page calls `host.rpc('finish', { r, ms })`; the host orders finishes by the room's `matchTime`, refuses times faster than the spout allows or from far below the top | the round's `match.data.fin` |
 | Places, points, round end | the host: all present racers finished, or 20 s after the first finish, or the cap; unfinished racers ranked by height | match record |
 
-Other spiders are drawn with `room.presenceAt(id, { angles: ['a'], snap: 400 })`. Your own spider is never corrected by the
+Other spiders are drawn with `room.presenceAt(id, { angles: ['a'], snap: 300 })`. A bump message is applied only when the
+bumper is within 90 units of the bumped spider as that page sees it, once per 0.9 s per pair. Tested through a fake room
+(`test/net.test.mjs`): pages see each other, bots on a guest's page stay within 150 units of the host's, finishing goes
+through the host once per round, a new host adopts the bots from the last snapshot and keeps them climbing, a latecomer
+watches with no spider and no presence, a leaver ranks last, the sun-set rule ends the round, and forged or far bumps,
+presence and snapshots are dropped. Your own spider is never corrected by the
 network. Everything read from the room is checked (types, ranges, round id, rate): a bad message is dropped.
 
 ## Progression and reasons to come back
@@ -197,17 +207,18 @@ World units: the pipe's free width is 170; 100 units = 1 m. Fixed step 120 Hz.
 | Bird | 3.2 s cycle (look 1.2, wind-up 0.5, peck 0.25, back 1.25); the beak reaches 70 into the pipe, so the far wall is safe; a peck flicks you down and across |
 | Moss | no grip (Hold scrabbles), you slide down 40 u/s when standing still |
 | Warm-air vent | a 400-tall column: airborne spiders accelerate up 1,400 u/s² to 300 u/s; the flush still washes you out of it |
-| Double wave | flush 1.4 s, gap 0.9 s, flush 1.4 s (holding through it runs out of grip) |
-| Surge | flush 3.6 s: longer than grip, so you need a dry spot or you lose height |
+| Double wave | flush 1.2 s, gap 1.0 s, flush 1.2 s (holding through both runs grip low; let go in the gap) |
+| Surge | flush 3.4 s with a 3 s warning: longer than grip, so you need a dry spot or you lose height |
+| First two flushes of every race (and of Monsoon) | gentle: 3 s warning, 1.2 s of water |
 
 Rain per spout (calm / flush; each race starts with 5 s of sun):
 
 | Spouts | Calm | Flush | Period | Extras |
 |---|---|---|---|---|
 | 1-3 (Drizzle) | 6-7.5 s | 1.4-1.8 s | 9.5-11 s | |
-| 4-6 (Shower) | 4.5-6 s | 1.8-2.0 s | 8.5-10 s | doubles from 5 (1 in 4 waves) |
-| 7-9 (Downpour) | 3.5-5 s | 2.0-2.2 s | 7.5-9 s | surges 1 in 4 |
-| 10-12 (Storm) | 2.5-4 s | 2.2-2.5 s | 6.5-8.5 s | surges and doubles, never two surges in a row |
+| 4-6 (Shower) | 4.5-6 s | 1.8-2.0 s | 8.5-10 s | doubles from 5 (1 in 4 waves); debris on 4 and 5 |
+| 7-9 (Downpour) | 3.5-5 s | 2.0-2.2 s | 7.5-9 s | surges 1 in 5 (Church 1 in 4), doubles 1 in 10 |
+| 10-12 (Storm) | 2.5-4 s | 2.2-2.5 s | 6.5-8.5 s | surges 1 in 5, doubles 1 in 7, never two surges in a row; lightning on 10 |
 
 **Race lengths:** Garden Shed ~20 s for an expert, ~40 s for a beginner; Skyscraper ~70 s / ~130 s.
 
@@ -215,49 +226,62 @@ Rain per spout (calm / flush; each race starts with 5 s of sun):
 chance to miss a hold lerp(18%, 2%), let-go delay lerp(0.6, 0.05) s, jump chains only above 0.5 (jump-angle error
 lerp(15°, 3°)), dry-spot use above 0.4. Five personalities on top: **Hopper** (jumps even when it's risky), **Mabel**
 (holds early, rarely washed), **Dash** (never holds early, often washed), **Velvet** (loves dry spots), **Inch** (slow and
-steady). A race's five bots spread across a range by cup: Drizzle 0.15-0.60, Shower 0.25-0.70, Downpour 0.35-0.80,
-Storm 0.45-0.90. A first-time player beats two or three; a good player has to work for first.
+steady). A race's bots spread evenly across a range by cup (the first seat gets the strongest): Drizzle 0-0.55,
+Shower 0.15-0.65, Downpour 0.3-0.8, Storm 0.4-0.9. A beginner beats at least one bot in the first race (tested: a 0.2
+climber beats the weakest Drizzle bot); the 0.9 bot is beaten only with good routes (dry spots, jump chains).
 
-**Stars:** gold = the 0.9 bot's median time, silver = the 0.5 bot's, finish = one star.
+**Stars** (finish = one star; then silver, then gold; seconds, set from simulated bot runs near the 0.5 and 0.9 bots' times):
 
-**How it's checked (node tests):** every bot skill finishes every spout under the cap across 200 seeds; times land in the
-table's ranges; skill orders finishing times; gold is reachable by the best bot in ≥ 30% of seeds; no grip value goes
-negative and no NaN over full races; every wave gives ≥ 2 s of warning; a flush (not a surge) is always survivable by
-holding from impact with full grip; cup simulations show the leader after two races loses the cup ≥ 20% of the time (no
-runaway); Monsoon bots reach ~40 / ~120 / ~300 m at skill 0.3 / 0.6 / 0.9.
+| Spout | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Silver | 24 | 29 | 33 | 40 | 47 | 44 | 59 | 56 | 70 | 97 | 99 | 117 |
+| Gold | 21 | 25 | 28 | 34 | 36 | 35 | 53 | 47 | 56 | 73 | 78 | 86 |
+
+**How it's checked (node tests, 46):** every spout's path is clean (no zero or backwards segments, normals into the
+pipe) and its dry pockets lie on it; Up alone climbs every spout to the sun on a dry day; the stick direction is latched
+round corners and never flips mid-press; Up + Jump from a wall lands on the opposite wall, higher; every wave gives ≥ 2 s of warning and the first
+two are gentle; a flush (not a surge) is survivable by holding from impact with full grip; dry pockets stay dry; in full cup
+races across seeds ≥ 90% of bots finish and winners take 12-150 s with no NaN; skill orders finishing times; the 0.9 bot
+reaches gold and the 0.5 bot silver in ≥ 2 of 8 seeds; a 0.2 beginner beats the weakest Drizzle bot; over 14 simulated
+cups the leader after two races loses at least twice (no runaway); Monsoon builds valid spouts for 25 seeds, its flood
+catches bots and a 0.9 bot climbs 50 m higher than a 0.15 one; and the race layer through a fake room (below).
 
 ## Every screen
 
 The UI is made of one thing: **zinc tags hanging on silk threads**. A riveted, stamped metal plate on two silk strands that
 swings in on a spring when it appears and sways in the wind. Buttons, the title, places and results are all tags.
 
-- **Title:** the attract race fills the screen; the name sign hangs from the gutter at the top third; the Play tag under it
-  (≥ 64 px tall, the key shown: "Play ⏎"). The platform's Ready strip is hidden here. Nothing else.
-- **Lobby:** the foot of the house in the garden, the spout's bottom ring as a bench. Up to six spiders sit on it, each with
-  a tag above: avatar head, name, a ✓ when ready, a small star for the host. Empty seats show the bot that will take them,
-  dimmed, with a "+" that opens `ow.ui.showInvite()`. Top (clear of the menu): the cup tag (cup name and its three
-  buildings; the host has ‹ › on it) and the Bots tag. Side (portrait: below the bench): two solo tags,
-  **Spouts ★ 14/36** and **Monsoon 212 m**. Bottom 88 px: the platform's Ready/Start strip. After a cup, the results
-  tags stay hanging behind until the next match starts.
-- **Round intro (4 s):** camera from the sun down to the start ring; the spout's tag swings in ("Church", with the cup's
-  three buildings, this one lit); 3, 2, 1 as huge stamped numerals with three drips; GO with a flare of the sun.
+- **Title:** the attract race (four real bots on a random early spout) fills the screen; the name sign hangs on silk at the
+  top (to the left of the spout on wide screens, so the race stays in view); the gold Play tag (56 px) at the bottom; Space
+  or Enter also plays. The platform's lobby bar is hidden here. Nothing else.
+- **Lobby:** the foot of the cup's first spout: the players and the bots that will fill the seats stand on the drain
+  (facing each other), names above them (yours gold, bots dimmed). Top (clear of the menu): the cup tag (cup name and its
+  three buildings; the host has ‹ › beside it) and the Bots tag (Fill/Off, the host's). Bottom, above the platform's
+  lobby bar (which shows who is ready): **Spouts ★ 14/36**, **Monsoon 212 m** and **+ Invite** (`ow.ui.showInvite()`).
+- **Round intro (5 s):** camera from the sun down to the start ring; the spout's tag swings in ("Church", with the cup's
+  three buildings, this one lit); 3, 2, 1 as huge stamped numerals with three drips; GO with a flare of the sun. The
+  platform's helper writes the round's data only when play begins, so during the intro every page works out the same
+  spout and seed itself (cup, round, round id: what the host's `startRound` will return) and shows the real start.
 - **Play HUD:** top-right: the **weather drop** (sun disk in calm; a swelling teardrop with the seconds inside during a
   warning; a jagged burst for a surge; draining while the flush passes over you) and beside it the **place tag** ("2ND",
   huge numerals) or, solo, the clock. The **climb line** down the right edge: a silk thread from the sun to the ground with
   every spider as a bead (seat colour + pattern symbol; you bigger, outlined; the ghost in solo; the flood in Monsoon).
   Grip on the spider (legs + a thin arc while not full). A bone-white chevron over your spider; small outlined names over
   the others. After the first finish, the sun on the climb line turns orange and "0:20" counts down by the place tag.
+  **Out came the sun:** at the top the camera lifts to the sky over the roofs and the sky clears for you (gold light, the
+  drop turns to the sun, no more warnings); 2.5 s later in a race it goes down to watch the best spider still climbing.
   Nothing in the lower corners while touch controls are on; everything laid out from `ow.ui.reserved`.
-- **Between spouts (5 s):** this race's places as tags dropping on silk to heights by place, "+10 +7 +5" flying into the
-  totals, the cup's three buildings with the next one lit.
-- **Cup results (20 s):** the winner's spider dances on the gutter in a sunbeam, raindrops turned to gold confetti; three
-  podium tags (avatar head, name, points) hanging at three heights; your line ("4th · 19 pts · held 9"). Private host: a
-  Continue tag.
-- **Spouts menu:** four rows (cups) of three building tags (silhouette, name, three star slots, best time); locked ones dark
-  with a padlock stamp; a Back tag. Portrait 3 × 4, landscape 6 × 2.
-- **Solo finish:** the time, huge; three stars stamp in one by one; best and board rank; **Next** (main), Again, Back.
+- **Between spouts (6 s):** this race's places as tags swinging in on silk one after another (place, seat mark, name,
+  "+10"), yours outlined in gold.
+- **Cup results (20 s):** gold confetti on the winner's spider; three podium tags (place, seat mark, name, points)
+  hanging at three heights, the winner's gold; your line ("4th · 19 pts"). Private host: a Continue tag.
+- **Spouts menu:** a grid of twelve small tags (number, name, three star slots, best time); locked ones dimmed and marked
+  Locked; a Back tag.
+- **Solo finish:** the time, huge; the stars pop in one by one with a note each; the old best; **Next** (main), Again,
+  Back (after the first climb: **Race** and Again). The ghost of your best run climbs beside you next time.
 - **Monsoon end:** the flood swallows the spider in a splash; "212 m" huge; best and today's best; **Again** (main), Back.
-- **Pause (solo):** Resume (main), Restart, Back. Opens on `ow.on('pause')`, `visibilitychange`, Esc/P.
+- **Pause (solo):** Resume (main), Restart, Back. Opens from the II tag at the top left, `ow.on('pause')` (and closes
+  on `resume` when the menu opened it), `visibilitychange`, Esc/P.
 - **Room closed:** one tag, one button: kicked "You were removed" + Play; disconnected "Connection lost" + Rejoin; replaced
   "Playing in another tab" + Play here.
 
@@ -280,17 +304,21 @@ garden. Everything is drawn in Canvas 2D in layers: sky and clouds, far rooftops
 | Moss | `#6F8F3C` |
 | Bone (text, with a `#0E141B` outline) | `#F3EDE2` |
 
-**Fonts** (self-hosted woff2, latin, OFL next to them): **Bricolage Grotesque ExtraBold** for words (the name, tags);
-**Big Shoulders Display Black** for numerals (places, times, metres), like the stamped markings on the pipe.
+**Fonts** (self-hosted woff2, latin, OFL next to them): **Alfa Slab One** for the name, numerals (places, times, metres,
+the 3-2-1) and the main buttons, like stamped markings on the pipe; **Sofia Sans Condensed ExtraBold** for words.
 
 **The signature:** the **flush**, a heavy glossy sheet of water with a white foam front, streaks rushing down, spray where
 it hits ledges and spiders, and the dry pockets it leaves under the bends. In the UI, the **zinc tags on silk**.
 
 **Light and camera:** side view. Cool blue ambient, warm window light on the pipe's outside, and in calm windows gold sun
 shafts slanting in through the seams (they fade as the clouds roll in). Lightning in storms: one frame lit cold white,
-silhouettes, a quick decay (not with reduced motion). The camera keeps the pipe centred and your spider 60% down the
-screen (more to see above); it shows at least 360 units across and 640 tall in portrait (520 in landscape), so landscape
-shows more house, never less pipe.
+silhouettes, a quick decay (not with reduced motion). The camera keeps the pipe centred and leads upward: your spider sits
+10% of the view below the middle in portrait and 20% in landscape, so a short landscape phone (844×390) still sees what's
+coming. It shows at least 360 units across and 640 tall in portrait (560 in landscape: zoomed out), so landscape shows more
+house, never less pipe. The translation snaps to whole device pixels so the cached art and the live layers line up.
+
+**The rain warning reads anywhere:** besides the drop, a gutter strip along the very top edge of the screen fills from both
+sides as the water comes and pours white under the flush, with the warning's rumble and ticks; lightning in storms.
 
 **Spiders:** stylish jumping spiders, not creepy: a chunky fuzzy body, two big glossy front eyes with catchlights, a round
 abdomen with a seat colour and a pattern (gold ring, coral stripes, leaf dots, sky chevron, rose diamond, bone star), eight
@@ -319,18 +347,22 @@ All synthesized Web Audio.
 
 ## Store art and the trailer
 
-- **Cover** (1280×720): a bend where the pipe crosses the frame diagonally; three spiders, one planted as the flush front hits
-  in a burst of spray, one tumbling, one leaping; gold shafts breaking at the top right; "Itsy Bitsy Spider" big on the
-  brick at the left.
-- **Action:** close-up of a spider washed down in spray, legs flailing, droplets frozen.
-- **Win:** a spider on the gutter's edge in full gold sun, front legs raised, the rainy garden far below.
-- **Multi:** six spiders across a section as the water arrives: who holds, who doesn't.
-- **Icon** (512): a jumping spider's face and front legs gripping zinc, big eyes catching gold light, water spraying past.
-- **Badges:** a bold symbol (a sun, a drop, a ring, a leaf, a cup, a star) on a coloured disc.
-- **Trailer (~30 s):** 0-3 s the flyover from the sun down to three climbing spiders (goal + racers); 3-8 s the flush hits,
-  holders vs the washed; 8-14 s a sunny window, gold beams, chained jumps, an overtake and a bump; 14-20 s the bird flicks a
-  rival, a cap bonks off a holder, a surge sends everyone diving for a dry spot; 20-27 s the race to the top and the burst
-  into the sun; 27-30 s the name over the attract race.
+All made by the game itself (`?poster=<name>`, `game/poster.js`): a seeded bot race is simulated, every 1/30 s scored for
+the picture, and the best moment replayed with the spiders' animation and particles settled.
+- **Cover** (1280×720): the Bakery's bend at dusk, the flush front breaking at the jog in foam and spray, spiders planted
+  and tumbling around it; the name on a zinc sign at the left ("Itsy Bitsy" over "SPIDER").
+- **Action:** the Farmhouse, close in on a spider washed down the shaft in spray.
+- **Win:** the Barn's gutter in full sun: the winner on the edge, front legs up, a gold sunburst and confetti behind.
+- **Multi:** the Greenhouse, the first water of a race arriving over all six spiders: who holds, who doesn't.
+- **Icon** (512): a spider gripping a zinc ledge, big eyes, water sheeting past, gold light top right.
+- **Badges:** a bold symbol on a coloured disc: a spider under a sun (first climb), a drop over eight feet (hold on), waves
+  and a falling arrow (washed out), the sun, a U-turn arrow (up the spout again), a cup, a crossed-out drop (no washouts),
+  a pipe with 12, three stars, a lightning bolt over 100.
+- **Trailer** (`store/trailer.mp4`, 23.7 s, 1280×720, the game's own sound): captured from autoplay races on private
+  servers at 2× pixels (no hints), six hard cuts: the flush front crashing onto three bracing spiders (a closer frame);
+  the pack of six climbing the Barn; neck and neck, then a flush washes the leader down a bend; a surge on the
+  Lighthouse and a dive into a dry pocket; the last stretch, rivals bursting into confetti and the sun coming out over
+  the roofs; the name sign over the title's attract race.
 
 ## Originality check
 
@@ -350,8 +382,9 @@ the rain is the referee and the leader is hit first.
   edge), and the first one gets an arrow.
 - **Jumps feeling floaty or random in a narrow shaft.** Tuned so Up + Jump always lands on the opposite wall higher; a test
   checks the jump table from every wall angle.
-- **Phone performance** (water, rain, six spiders with legs). Static pipe art pre-rendered into chunks; rain and particles
-  scale with `ow.settings.quality`; draw at `pixelRatio(2)`; no allocations per frame.
+- **Phone performance** (water, rain, six spiders with legs). The static house and pipe are painted once into 256-device-px
+  bands (offscreen canvases, a small LRU), so a frame draws a handful of images plus the live layers; rain and particles
+  scale with `ow.settings.quality`; draw at `pixelRatio(2)`, capped at 3.6 M device pixels; fixed particle pool.
 - **Clock and fairness.** The rain comes from match time on every page (±50 ms is invisible). Each page trusts its own
   spider, so cheating is possible: rewards stay cosmetic and the host rejects impossible finish times.
 - **Too much stuff.** The Drizzle cup is the core alone; each later spout adds one thing; there are four features in all.
@@ -368,6 +401,14 @@ the rain is the referee and the leader is hit first.
 - **Jump 520 with gravity 820** (not 420) so a cross-pipe jump is clearly faster than walking.
 - **First Play ever goes straight into Spout 1**, the gentle teaching climb, then the lobby.
 - **Our own 3-2-1 per spout** after a flyover (`countdown: 0`), so there is one countdown on screen.
+- **Plain Canvas 2D** with cached static layers instead of a WebGL stack: the look is carried by the flush (gloss runs that
+  follow the bends, scrolling streaks, a foam front, spray), three layers of rain at different parallax, lightning frames
+  and warm windows.
+
+From the design review (built): hints by device (last input decides; touch points at the button); the surface mapping is
+latched while a direction is held, so left/right on a ceiling or inside an elbow never flips mid-press; the top-edge
+warning strip with sound and gentle first two flushes; landscape zoomed out with a stronger upward lead; static layers
+cached for phones; bot ranges set so a beginner beats one bot and the best needs good routes.
 
 ## Tech
 
@@ -379,8 +420,12 @@ the rain is the referee and the leader is hit first.
   `spider.js` (the fixed-step spider: surface walking, jumps, hold/grip, wash, catches, bumps), `bot.js` (the bot brain:
   inputs from skill and personality), `monsoon.js` (the endless generator and the flood), `race.js` (finish order, places,
   points), `ghost.js` (pack/unpack).
-- Page modules: `main.js` (boot, join, screens), `net.js` (match, host, bots, presence, snapshots, bumps, stub room for
-  standalone/poster), `render.js` (layers, chunk cache, camera), `draw-spider.js`, `water.js`, `fx.js` (particles, shake
-  as trauma², hit-stop), `hud.js`, `ui.js` (the tags on silk, DOM buttons), `audio.js`, `music.js`, `poster.js`.
-- Tests (`node --test`): physics, weather, level validity for every spout and 200 Monsoon seeds, bots and balance, race
-  scoring, ghost packing, and the room flow through a fake room (host reload, a leaver, a latecomer).
+- `run.js` (one climb on screen: a level, its weather and its spiders, stepped at 120 Hz; used by the title, the lobby,
+  solo, Monsoon and races) is pure too.
+- Page modules: `main.js` (boot, join, screens, input, camera, hints, saves), `net.js` (match rules, host state and rpc,
+  presence, snapshots, bumps; a stand-in SDK, room and local match for standalone and posters), `draw.js` (one frame in
+  order), `scene.js` (cached bands, sky, rain, ivy, hazards, mood), `water.js`, `spiderart.js` (the puppet: IK legs, gait),
+  `fx.js` (particles, shake as trauma², hit-stop), `hud.js`, `ui.js` (the tags on silk, DOM buttons), `audio.js` (synth
+  sounds and the music sequencer), `view.js`, `paint.js`, `poster.js`.
+- Tests (`node --test`): level, physics, weather, race scoring and ghosts, balance (cup simulations), Monsoon, and the race
+  layer through a fake room (host change, a leaver, a latecomer, bumps, validation).
