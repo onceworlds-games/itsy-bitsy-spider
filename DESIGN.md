@@ -296,7 +296,7 @@ at a fixed 60 steps a second without drawing, then one frame drawn once every te
 - **Multi:** the Schoolhouse, five spiders climbing, swinging and dodging between brick and classroom windows.
 - **Icon:** a coral spider in a yellow sou'wester, face on, on a blue sunburst.
 - **Badges:** enamel pins (coloured field, gold or steel ring, one bold symbol), drawn on a canvas by `src/poster.js`.
-- **Trailer** (`store/trailer.mp4`): real autoplay races with the game's own sound, ending on the name.
+- **Trailer** (`store/trailer.mp4`): 24 seconds of races with the game's sound, recorded before this rebuild; due a new take.
 
 ## Tech
 
@@ -310,6 +310,9 @@ at a fixed 60 steps a second without drawing, then one frame drawn once every te
 - Page: `main.js` (boot, join, screens, camera, combo, hints, saves, store shots), `net.js`, `hud.js`, `ui.js`, `input.js`,
   `audio.js`, `poster.js`, `paint2d.js`.
 - Quality follows the platform's Graphics setting (MSAA, shadow map size, pixel ratio, particle and rain counts).
+- Drawing in software (SwiftShader, llvmpipe: no usable GPU) the stage goes lite whatever the setting: low quality, few
+  pixels, no reflections, Lambert stand-ins for the PBR materials, and shaders compiled one at a time in tasks of their
+  own after the room join, so the page keeps answering its server while each takes seconds.
 - `?debug` outside Onceworlds prints errors on screen; `?poster=screen-<lobby|spouts|solo|monsoon|race|results>[.WxH]`
   stages a screen in a box of that size to check phone layouts.
 

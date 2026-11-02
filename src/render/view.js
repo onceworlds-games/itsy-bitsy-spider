@@ -31,6 +31,7 @@ export function createView(host, opts = {}) {
   scene.add(sky.dome, sky.skyline);
   const fx = createFx();
   scene.add(fx.mesh);
+  if (stage.lite) fx.density = 0.5;
   const juice = createJuice();
   let rain = createRain(stage.quality === 'low' ? 1200 : stage.quality === 'medium' ? 2200 : 3400);
   scene.add(rain.mesh);
@@ -39,7 +40,7 @@ export function createView(host, opts = {}) {
   // a pool of two warm lights that go to the nearest wall lamps
   const lampLights = [0, 1].map(() => {
     const l = new THREE.PointLight(0xffb060, 0, 1100, 2);
-    scene.add(l);
+    if (!stage.lite) scene.add(l);
     return l;
   });
 
@@ -300,7 +301,11 @@ export function createView(host, opts = {}) {
       t.colorSpace = THREE.SRGBColorSpace;
       scene.background = t;
     },
+    /** True when the browser draws WebGL in software (no GPU) and the stage draws lite. */
+    lite: stage.lite,
+    holdShaders: (p, ms) => stage.holdShaders(p, ms),
     setQuality(q) {
+      if (stage.lite) return;
       stage.setQuality(q);
       scene.remove(rain.mesh);
       rain = createRain(q === 'low' ? 1200 : q === 'medium' ? 2200 : 3400);

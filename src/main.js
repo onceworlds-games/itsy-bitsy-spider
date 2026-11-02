@@ -129,9 +129,13 @@ async function boot() {
 
   const uiRoot = document.getElementById('ui');
   const ui = createUI(uiRoot);
-  const quality = () => safe(() => ow.settings.quality) ?? params.get('q') ?? 'high';
+  let softGL = false; // drawing in software: lite, and few pixels, whatever the setting says
+  const quality = () => (softGL ? 'low' : (safe(() => ow.settings.quality) ?? params.get('q') ?? 'high'));
   const reduced = () => !!safe(() => ow.settings.reducedMotion);
   const view = createView(document.getElementById('stage'), { quality: quality(), preserve: !!STAGE || !!SHOT || params.has('shot') });
+  softGL = view.lite;
+  // drawing in software, the server comes first: the shaders (seconds each there) wait for the join
+  view.holdShaders(roomPromise);
   const juice = view.juice;
   const fx = view.fx;
   const hudCanvas = document.getElementById('hudc');
@@ -1785,7 +1789,7 @@ async function boot() {
       if (stageBox) Object.assign(uiRoot.style, { right: 'auto', bottom: 'auto', width: `${W}px`, height: `${HGT}px` });
     }
     let pr = safe(() => ow.settings.pixelRatio(2)) ?? Math.min(devicePixelRatio || 1, 2);
-    pr = Math.min(pr, Math.sqrt((quality() === 'high' ? 3.6e6 : quality() === 'medium' ? 2.2e6 : 1.2e6) / (W * HGT)));
+    pr = Math.min(pr, Math.sqrt((softGL ? 0.12e6 : quality() === 'high' ? 3.6e6 : quality() === 'medium' ? 2.2e6 : 1.2e6) / (W * HGT)));
     view.resize(W, HGT, pr);
     const hpr = Math.min(devicePixelRatio || 1, 2);
     hudCanvas.width = Math.round(W * hpr);

@@ -75,6 +75,21 @@ export function createStage(host, opts = {}) {
   renderer.setClearColor(0x0e141b, 1);
   host.append(renderer.domElement);
   renderer.domElement.id = 'game';
+  // A software renderer (SwiftShader, llvmpipe: a machine with no usable GPU, a headless test) draws every pixel and
+  // compiles every shader on the CPU, and a page waiting on it answers nothing (not even its server). Played that way
+  // (store pictures wait for their picture instead), the stage goes lite: low quality, no reflections, plain diffuse
+  // surfaces (a handful of small shaders instead of dozens of large ones), compiled off the page before they draw.
+  let software = false;
+  try {
+    const gl = renderer.getContext();
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    software = /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+  } catch {
+    software = false;
+  }
+  const lite = software && !preserve;
+  if (lite) renderer.debug.checkShaderErrors = false;
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x2a3440, 2600, 9000);
@@ -93,16 +108,19 @@ export function createStage(host, opts = {}) {
   scene.add(fill, fill.target);
   const rim = new THREE.DirectionalLight(0xffffff, 0.0);
   scene.add(rim, rim.target);
+  // lite: the sky and the sun only (every light is more code in every shader)
+  if (lite) scene.remove(fill, rim);
 
   // Reflections: a soft outdoor environment made once from a sky-like gradient room.
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(envScene(), 0.02).texture;
+  scene.environment = lite ? null : pmrem.fromScene(envScene(), 0.02).texture;
   scene.environmentIntensity = 0.8;
+  if (lite) hemi.intensity = 1;
 
   let composer = null;
   let bloom = null;
   let grade = null;
-  let quality = opts.quality ?? 'high';
+  let quality = lite ? 'low' : (opts.quality ?? 'high');
   let W = 1;
   let Hh = 1;
   let pr = 1;
@@ -144,7 +162,7 @@ export function createStage(host, opts = {}) {
   }
 
   function setQuality(q) {
-    if (q === quality) return;
+    if (lite || q === quality) return;
     quality = q;
     build();
   }
@@ -175,7 +193,117 @@ export function createStage(host, opts = {}) {
   function render(dt, t) {
     grade.uniforms.time.value = t % 100;
     grade.uniforms.aspect.value = W / Hh;
-    composer.render(dt);
+    if (lite) renderLite(dt);
+    else composer.render(dt);
+  }
+
+  // ---- lite drawing (software renderers)
+  const twins = new WeakMap();
+  const swapped = [];
+  let presented = false;
+  let compileTimer = 0;
+  let nextCompile = 0;
+  let held = null; // what the first shaders wait for (the page's server first: joining wants a page that answers)
+  /** Compiles the shaders of one object (with its stand-ins), as a task of its own. */
+  function compileNow(o) {
+    const t0 = performance.now();
+    const back = [];
+    o.traverse((c) => {
+      const src = c.material;
+      if (!src || !c.isMesh) return;
+      const dst = Array.isArray(src) ? src.map(twinOf) : twinOf(src);
+      if (dst !== src) {
+        back.push(c, src);
+        c.material = dst;
+      }
+    });
+    try {
+      // (compiled for the picture it is drawn into, not the screen: the same shader the next frame asks for)
+      renderer.setRenderTarget(composer.readBuffer);
+      for (const m of renderer.compile(o, camera, scene)) renderer.properties.get(m).currentProgram?.getUniforms();
+    } catch {
+      /* drawn as it can be */
+    } finally {
+      renderer.setRenderTarget(null);
+      for (let i = 0; i < back.length; i += 2) back[i].material = back[i + 1];
+    }
+    // a breath after each, so the page's messages (its server's among them) are answered in between
+    const took = performance.now() - t0;
+    nextCompile = performance.now() + Math.min(2000, Math.max(100, took * 0.5));
+  }
+  /** A Lambert stand-in for a PBR material, kept in step with what the game changes on the original. */
+  function twinOf(m) {
+    if (!m || !m.isMeshStandardMaterial) return m;
+    let l = twins.get(m);
+    if (!l) {
+      l = new THREE.MeshLambertMaterial();
+      l.userData.sig = '';
+      twins.set(m, l);
+    }
+    l.color.copy(m.color);
+    l.emissive.copy(m.emissive);
+    l.emissiveIntensity = m.emissiveIntensity;
+    l.map = m.map;
+    l.emissiveMap = m.emissiveMap;
+    l.alphaMap = m.alphaMap;
+    l.opacity = m.opacity;
+    l.transparent = m.transparent;
+    l.alphaTest = m.alphaTest;
+    l.side = m.side;
+    l.vertexColors = m.vertexColors;
+    l.depthWrite = m.depthWrite;
+    l.depthTest = m.depthTest;
+    l.blending = m.blending;
+    l.fog = m.fog;
+    l.visible = m.visible;
+    l.flatShading = m.flatShading;
+    l.polygonOffset = m.polygonOffset;
+    l.polygonOffsetFactor = m.polygonOffsetFactor;
+    l.polygonOffsetUnits = m.polygonOffsetUnits;
+    const sig = `${!!l.map}${!!l.emissiveMap}${!!l.alphaMap}${l.vertexColors}${l.transparent}${l.alphaTest > 0}${l.flatShading}${l.fog}${l.side}`;
+    if (sig !== l.userData.sig) {
+      l.userData.sig = sig;
+      l.needsUpdate = true;
+    }
+    return l;
+  }
+  function renderLite(dt) {
+    let unready = null;
+    scene.traverseVisible((o) => {
+      const src = o.material;
+      if (!src) return;
+      const dst = !o.isMesh ? src : Array.isArray(src) ? src.map(twinOf) : twinOf(src);
+      if (dst !== src) {
+        swapped.push(o, src);
+        o.material = dst;
+      }
+      if (!unready) for (const m of Array.isArray(dst) ? dst : [dst]) if (m && renderer.properties.get(m).currentProgram === undefined) unready = o;
+    });
+    try {
+      if (unready) {
+        // One new shader at a time, in a task of its own, the last picture shown again meanwhile: a software renderer
+        // takes seconds over each, and the page answers nothing while it waits (all of them at once held it for minutes).
+        if (!compileTimer && !held) {
+          const o = unready;
+          compileTimer = setTimeout(
+            () => {
+              compileTimer = 0;
+              compileNow(o);
+            },
+            Math.max(0, nextCompile - performance.now()),
+          );
+        }
+        renderer.setRenderTarget(null);
+        if (presented) grade.render(renderer, null, composer.writeBuffer); // (the grade pass swapped: the scene is here)
+        else renderer.clear();
+      } else {
+        composer.render(dt);
+        presented = true;
+      }
+    } finally {
+      for (let i = 0; i < swapped.length; i += 2) swapped[i].material = swapped[i + 1];
+      swapped.length = 0;
+    }
   }
 
   return {
@@ -194,6 +322,16 @@ export function createStage(host, opts = {}) {
     },
     get size() {
       return { w: W, h: Hh, pr };
+    },
+    software,
+    lite,
+    /** Lite: shaders wait for this promise (settled or not, at most `ms`) before they start compiling. */
+    holdShaders(promise, ms = 15000) {
+      if (!lite) return;
+      const h = Promise.race([Promise.resolve(promise).catch(() => {}), new Promise((r) => setTimeout(r, ms))]).then(() => {
+        if (held === h) held = null;
+      });
+      held = h;
     },
     resize,
     setQuality,
