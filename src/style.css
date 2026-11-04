@@ -223,9 +223,6 @@ button.tag[disabled] .face {
 
 /* ------------------------------------------------------------ screens */
 
-.title {
-  justify-content: space-between;
-}
 .sign {
   display: flex;
   flex-direction: column;
@@ -273,10 +270,6 @@ button.tag[disabled] .face {
   color: var(--gold);
   letter-spacing: 0.02em;
 }
-.title .play {
-  margin-bottom: 18px;
-}
-
 .spouts {
   justify-content: flex-start;
 }
@@ -622,15 +615,6 @@ button.tag[disabled] .face {
 
 /* Wide screens: the sign hangs to the left of the spout, so the race up it stays in view. */
 /* (.wide: at least 6:5) */
-:where(.wide) .title {
-  align-items: flex-start;
-}
-:where(.wide) .title .sign {
-  margin-left: max(0px, calc(25% - 230px));
-}
-:where(.wide) .title .play {
-  align-self: center;
-}
 
 .withstar {
   display: inline-flex;

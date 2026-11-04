@@ -102,7 +102,7 @@ export function hudLayout(W, H, reserved, touch) {
 /**
  * Draws the HUD (screen transform set, CSS pixels).
  * h: { W, H, t, layout, weather: { calm, warnK, next, kind, wet, left, dur }, label, sub, closing, line, me, names, hint,
- *      debris, countdown, go, reduced, touch, buttons }
+ *      debris, reduced, touch, buttons }
  */
 export function drawHud(ctx, h) {
   const { W, t, layout } = h;
@@ -269,7 +269,6 @@ export function drawHud(ctx, h) {
   if (h.flies) drawFlies(ctx, h);
   if (h.pops?.length) drawPops(ctx, h);
   if (h.hint) drawHint(ctx, h);
-  if (h.countdown) drawCount(ctx, h);
 }
 
 /**
@@ -498,30 +497,6 @@ function drawHint(ctx, h) {
   }
 }
 
-function drawCount(ctx, h) {
-  const c = h.countdown;
-  const k = clamp(c.k, 0, 1);
-  const scale = h.reduced ? 1 : 1.5 - 0.5 * easeOutBack(Math.min(1, k * 3));
-  const a = k > 0.75 ? (1 - k) * 4 : 1;
-  ctx.save();
-  ctx.globalAlpha = clamp(a, 0, 1);
-  ctx.translate(h.W / 2, h.H * 0.4);
-  ctx.scale(scale, scale);
-  const big = Math.min(150, h.W * 0.32);
-  outlined(ctx, c.text, 0, 0, big, { font: FONT_DISPLAY, weight: 400, line: big * 0.12, fill: c.text === 'GO' ? GOLD : BONE });
-  if (c.text !== 'GO' && !h.reduced) {
-    // Three drips running off the numeral.
-    ctx.fillStyle = WATER;
-    for (let i = -1; i <= 1; i++) {
-      const dy = big * 0.42 + k * big * 0.5 * (1 + 0.3 * i * i);
-      ctx.beginPath();
-      ctx.arc(i * big * 0.18, dy, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  ctx.restore();
-}
-
 /**
  * Names over the spiders: each at its spider unless it would cover a name already placed (or your chevron); then it
  * steps up a row, with a silk thread down to its spider. A gold check follows a player who is ready.
@@ -532,9 +507,8 @@ function packNames(ctx, names, me) {
   const boxes = me ? [{ x0: me.sx - 11, x1: me.sx + 11, y: me.sy - 38 }] : [];
   const placed = sorted.map((n) => {
     const tw = ctx.measureText(n.name).width;
-    const wd = tw + (n.ready ? 17 : 0);
-    const x0 = n.sx - wd / 2;
-    const x1 = n.sx + wd / 2;
+    const x0 = n.sx - tw / 2;
+    const x1 = n.sx + tw / 2;
     let y = n.sy - 32;
     for (let k = 0; k < 8 && boxes.some((b) => x0 < b.x1 + 6 && x1 > b.x0 - 6 && Math.abs(y - b.y) < 19); k++) y -= 21;
     boxes.push({ x0, x1, y });
@@ -551,20 +525,5 @@ function packNames(ctx, names, me) {
   }
   for (const p of placed) {
     outlined(ctx, p.n.name, p.x0 + p.tw / 2, p.y, 16, { fill: p.n.color ?? BONE });
-    if (p.n.ready) {
-      const cx = p.x0 + p.tw + 10;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(cx - 5, p.y);
-      ctx.lineTo(cx - 1, p.y + 4);
-      ctx.lineTo(cx + 6, p.y - 5);
-      ctx.strokeStyle = INK;
-      ctx.lineWidth = 6;
-      ctx.stroke();
-      ctx.strokeStyle = GOLD;
-      ctx.lineWidth = 2.6;
-      ctx.stroke();
-    }
   }
 }

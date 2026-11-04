@@ -13,7 +13,7 @@
     { "keys": ["Space", "K", "Jump button"], "action": "Jump (hold to go higher)" },
     { "keys": ["Space", "K", "Jump button"], "action": "In the air near a bolt: shoot silk" },
     { "keys": ["Esc", "P"], "action": "Pause a solo climb" },
-    { "keys": ["Enter", "Space", "Tap"], "action": "Play, and pick in menus" }
+    { "keys": ["Space", "Tap"], "action": "Pick in menus" }
   ],
   "data": {
     "held-today": { "type": "counter", "add": [1, 20], "reset": "daily" },

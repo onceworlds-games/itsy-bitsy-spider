@@ -36,8 +36,8 @@ Everything else (moss, falling caps, the sparrow, warm-air vents, doubles, surge
 
 | Time | What happens |
 |---|---|
-| 0 s | **Title:** a live bot race on an early spout fills the screen; the name sign hangs on silk beside the pipe; one gold Play tag. |
-| 2 s | Play. First visit ever: straight into Spout 1, Garden Shed, alone. The camera starts at the sun and sweeps down to your spider on the drain grate. |
+| 0 s | **Lobby**, as the page comes up: your spider and the bots on the drain grate; the platform's Ready strip. No Play to press. First-time hints run in your first race, or in Spout 1 (Spouts) alone. |
+| 2 s | Ready, the platform's 3-2-1, and you are climbing. |
 | 4 s | Control. "Up to climb" (phone: "Push up to climb", pointing at the stick). Flies in a line show the way up. |
 | 6 s | Running on: "Keep running: faster". A bracket ahead: "Space to jump · hold for higher". |
 | 8 s | First warning: drips, rumble, "Rain coming". The ring closes on your spider: "Hold J when the ring is gold". |
@@ -45,7 +45,6 @@ Everything else (moss, falling caps, the sparrow, warm-air vents, doubles, surge
 | 11 s | The water passes, gold light floods back; "Let go to climb" if still gripping. |
 | 15-30 s | A dry nook ("Dry spot", with an arrow), a twig to land on, the golden fly above it, two more waves. |
 | ~30 s | Out over the gutter into the sun: slow motion, confetti, the dance; the time, stars, silk lines and the level bar. **Race** (main), Again. |
-| ~40 s | **Lobby**: your spider and the bots on the drain grate; "Ready to race". |
 
 Hints follow the device in hand (the last input decides), show once (a few up to four times) and are remembered in the
 save.
@@ -58,7 +57,7 @@ save.
 | Jump (hold for higher); in the air near a bolt: silk | Space / K | **Jump** button |
 | Grip (keep it down) | J / Shift | **Hold** button (first, biggest) |
 | Pause (solo) | Esc / P | the platform menu |
-| Menus | Enter / Space, Tab, click | tap |
+| Menus | Space, click (Enter is the platform's Ready key) | tap |
 
 - The stick is projected on the surface you stand on; where that is weak (Up on a ceiling), Up/Down follow the way that
   leads up/down the spout. The direction is latched round corners while the stick is held, so it never flips mid-press.
@@ -123,13 +122,13 @@ climb. The flood catching you ends the run. Score: metres. Boards: `monsoon` (be
 
 ## Multiplayer
 
-**Public game.** `ow.rooms.join({ maxPlayers: 6, minPlayers: 1, lobby: 'bar', countdown: 0, settings })` once on load.
+**Public game.** `ow.rooms.join({ maxPlayers: 6, minPlayers: 1, lobby: 'bar', settings })` once on load.
 The host picks `cup` (Drizzle / Shower / Downpour / Storm) and `bots` (Fill / Off); everyone readies again after a change.
 Joining never starts anything; private rooms start when the host does.
 
 **A match is a cup: three spouts, one race each.** Points by place 10, 7, 5, 3, 2, 1; most points wins the cup (a tie goes
-to the better place in the last race). `createMatch` with `rounds: 3`, `introSeconds: 5` (flyover from the sun, our own
-3-2-1), `roundSeconds: 240`, `roundEndSeconds: 6`, `resultsSeconds: 20`, `admit: 'round'`. Bots fill empty seats
+to the better place in the last race). `createMatch` with `rounds: 3`, `introSeconds: 0` (the platform's 3-2-1 is the only
+countdown), `roundSeconds: 240`, `roundEndSeconds: 6`, `resultsSeconds: 12`, `admit: 'round'`. Bots fill empty seats
 (`createBots`), simulated on the host's page with the same physics and inputs a player has. Latecomers watch, then join
 at the next spout in a bot's seat. Leavers keep their place, ranked below everyone still racing. A new host adopts the bots
 from the last snapshot.
@@ -231,7 +230,6 @@ chest, streak, cleaned saves).
 
 The UI is one thing: **riveted zinc tags hanging on silk threads**, swinging in on a spring.
 
-- **Title:** the live bot race; the name sign on silk; Play.
 - **Lobby:** the foot of the cup's first spout, everyone on the drain grate. Top: the cup tag (host: ‹ ›) and Bots. Side:
   your level tag (level, silk bar, streak; opens the wardrobe) and the goals card (today's three, the chest, this week's
   goal). Bottom, above the platform's lobby bar: Spouts ★ n/36, Monsoon (best), + Invite.

@@ -17,9 +17,9 @@ export const SETTINGS = [
   { id: 'cup', label: 'Cup', options: CUPS.map((c) => ({ value: c.id, label: c.name })), default: 1 },
   { id: 'bots', label: 'Bots', options: [{ value: 'fill', label: 'Fill' }, { value: 'off', label: 'Off' }], default: 'fill' },
 ];
-export const JOIN = { maxPlayers: 6, minPlayers: 1, lobby: 'bar', countdown: 0, settings: SETTINGS };
-export const INTRO = 5;
-export const RULES = { rounds: 3, introSeconds: INTRO, roundSeconds: ROUND_CAP, roundEndSeconds: 6, resultsSeconds: 20, points: POINTS, admit: 'round' };
+export const JOIN = { maxPlayers: 6, minPlayers: 1, lobby: 'bar', settings: SETTINGS };
+// introSeconds 0: the platform's 3-2-1 is the countdown, and at its end the spider climbs
+export const RULES = { rounds: 3, introSeconds: 0, roundSeconds: ROUND_CAP, roundEndSeconds: 6, resultsSeconds: 12, points: POINTS, admit: 'round' };
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const num = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;

@@ -44,6 +44,10 @@ export function tag(text, opts = {}) {
 
 export function createUI(root) {
   let current = null;
+  // A click leaves the focus where it was: Enter is the platform's Ready key and mustn't press a tag again as well.
+  root.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button')) e.preventDefault();
+  });
   return {
     root,
     /** Replaces the screen. Returns the new layer. */
@@ -60,8 +64,6 @@ export function createUI(root) {
       build(layer);
       root.append(layer);
       current = layer;
-      const main = layer.querySelector('button.main:not([disabled])');
-      if (main && !matchMedia('(pointer: coarse)').matches) setTimeout(() => main.focus({ preventScroll: true }), 30);
       return layer;
     },
     get current() {

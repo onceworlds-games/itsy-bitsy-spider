@@ -14,7 +14,7 @@ import { featuresIn, inPocket } from './sim/level.js';
 import { snagFor, modeName } from './sim/spider.js';
 import { hashString } from './sim/rng.js';
 import { rankRace, pointsFor } from './sim/race.js';
-import { JOIN, INTRO, createNet, cupRules, roundInfo, stubOw, stubRoom, createLocalMatch, readLook } from './net.js';
+import { JOIN, createNet, cupRules, roundInfo, stubOw, stubRoom, createLocalMatch, readLook } from './net.js';
 import { createUI, setInsets, tag, h, stars } from './ui.js';
 import { drawHud, hudLayout } from './hud.js';
 import { fmtTime, ORD, clamp } from './paint2d.js';
@@ -282,12 +282,16 @@ async function boot() {
         }
         return true;
       }
-      if (flow === 'title' && (e.code === 'Enter' || e.code === 'Space') && !e.repeat) {
-        e.preventDefault();
-        play();
-        return true;
-      }
       if (!e.repeat) startAudio();
+      // Space takes a menu's main button (Enter is the platform's Ready key in the lobby; closed, it can only mean this)
+      if ((e.code === 'Space' || (e.code === 'Enter' && flow === 'closed')) && !e.repeat && !isPlaying()) {
+        const main = ui.current?.querySelector('button.main:not([disabled])');
+        if (main) {
+          e.preventDefault();
+          main.click();
+          return true;
+        }
+      }
       return false;
     },
     onPointer() {
@@ -314,7 +318,6 @@ async function boot() {
   let curRun = null; // the run on screen
   let lobbyRun = null;
   let lobbyKey = '';
-  let attract = null;
   let paused = false;
   // store art: { t, frozen, done, sunny, ... }; until it is staged nothing is drawn (posters run on software renderers)
   let shot = SHOT ? { manual: true } : null;
@@ -322,7 +325,6 @@ async function boot() {
   let solo = null; // { id, tutorial, ghost, doneAt }
   let mon = null; // { day, doneAt }
   let hint = { text: '', age: 0, life: 0, target: null, key: '' };
-  let count = null;
   let roundShown = '';
   let wardrobeSlot = 'species';
   let flyover = null;
@@ -377,45 +379,6 @@ async function boot() {
       ),
     );
   }
-  const hideLobby = (on) => safe(() => room?.hideLobby?.(on));
-
-  function showTitle() {
-    flow = 'title';
-    clearHint();
-    hideLobby(true);
-    setControls(false);
-    setMusic('menu');
-    newAttract();
-    ui.show('title', (el) => {
-      el.append(
-        h('div', { class: 'sign' }, h('span', { class: 'l1', text: 'Itsy Bitsy' }), h('span', { class: 'l2', text: 'Spider' })),
-        tag('Play', { main: true, silk: 18, delay: 200, onclick: play, cls: 'play' }),
-      );
-    });
-  }
-
-  function newAttract() {
-    const pick = [1, 2, 4, 5, 8, 6, 10, 3, 7, 9][Math.floor(Math.random() * 10)];
-    const seats = ['Hopper', 'Mabel', 'Dash', 'Velvet'].map((name, i) => ({ id: `a${i}`, name, bot: true, skill: [0.55, 0.7, 0.82, 0.94][i], index: i + 1 }));
-    attract = createRun({ kind: 'attract', spout: pick, seed: Math.floor(Math.random() * 1e6), seats });
-    attract.until = 0;
-    useRun(attract);
-  }
-
-  let starting = false;
-  async function play() {
-    if (starting || flow !== 'title') return;
-    starting = true;
-    startAudio();
-    sfx('ui');
-    await loadSaves;
-    starting = false;
-    if (flow !== 'title') return;
-    if (AUTOPLAY) save.tut = true;
-    if (inRacePhase()) enterRace();
-    else if (!save.tut) startSolo(1, true);
-    else toLobby();
-  }
 
   function toLobby() {
     flow = 'lobby';
@@ -423,7 +386,6 @@ async function boot() {
     paused = false;
     solo = null;
     mon = null;
-    hideLobby(false);
     setControls(false);
     setMusic('menu');
     setMusicWeather('sun');
@@ -432,14 +394,13 @@ async function boot() {
     refreshLobby(true);
     announceLevels();
     loadCommunity();
-    if (!save.seen.lobby) setTimeout(() => flow === 'lobby' && showHint('lobby', 'Ready to race', 'Ready to race', { target: 'lobby', life: 4 }), 900);
   }
 
   function lobbySeats() {
     const list = [];
     const players = room ? [...room.players.values()].filter((p) => p.connected !== false) : [];
     players.sort((a, b) => (a.id === room.me.id ? -1 : b.id === room.me.id ? 1 : 0));
-    players.slice(0, 6).forEach((p, i) => list.push({ id: p.id, name: p.name ?? 'Player', me: p.id === room.me.id, index: i, ready: !!p.ready || p.id === room.host, dance: !!p.ready }));
+    players.slice(0, 6).forEach((p, i) => list.push({ id: p.id, name: p.name ?? 'Player', me: p.id === room.me.id, index: i, dance: !!p.ready }));
     const fillBots = (room?.settings?.bots ?? 'fill') !== 'off';
     const humans = list.length;
     for (let i = humans; i < 6 && fillBots; i++) list.push({ id: `pv${i}`, name: BOT_NAMES[i - humans], bot: true, index: i, skill: 0.5 });
@@ -588,7 +549,6 @@ async function boot() {
     sfx('ui');
     const id = ((cupNow().id - 1 + d + CUPS.length) % CUPS.length) + 1;
     safe(() => room.setSetting('cup', id));
-    safe(() => room.clearReady?.());
     if (room.stub) room.settings.cup = id;
     refreshLobby();
   }
@@ -597,7 +557,6 @@ async function boot() {
     sfx('ui');
     const v = (room.settings?.bots ?? 'fill') === 'off' ? 'fill' : 'off';
     safe(() => room.setSetting('bots', v));
-    safe(() => room.clearReady?.());
     refreshLobby();
   }
 
@@ -605,7 +564,6 @@ async function boot() {
     sfx('ui');
     flow = 'spouts';
     clearHint();
-    hideLobby(true);
     ui.show('spouts', (el) => {
       const grid = h('div', { class: 'grid' });
       for (const s of SPOUTS) {
@@ -623,7 +581,7 @@ async function boot() {
             open && total ? h('span', { class: 'fl' }, h('i', { class: 'flyi' }), `${got}/${total}`, h('i', { class: `gdot ${rec.gold ? 'on' : ''}` })) : null,
             rec.best ? h('span', { class: 'best', text: fmtTime(rec.best) }) : null,
           ),
-          { small: true, silk: 10 + (s.id % 3) * 6, delay: s.id * 25, disabled: !open, onclick: open ? () => startSolo(s.id, false) : null, cls: `spout ${open ? '' : 'locked'}` },
+          { small: true, silk: 10 + (s.id % 3) * 6, delay: s.id * 25, disabled: !open, onclick: open ? () => startSolo(s.id, s.id === 1 && !save.tut) : null, cls: `spout ${open ? '' : 'locked'}` },
         );
         grid.append(b);
       }
@@ -649,7 +607,6 @@ async function boot() {
     sfx('ui');
     flow = 'wardrobe';
     clearHint();
-    hideLobby(true);
     ensureLobbyRun();
     drawWardrobe();
   }
@@ -723,7 +680,6 @@ async function boot() {
     solo = { id: def.id, tutorial, ghost: null, doneAt: 0 };
     mon = null;
     useRun(r);
-    hideLobby(true);
     setControls(true);
     setMusic('race');
     soloScreen(def.name);
@@ -748,7 +704,6 @@ async function boot() {
       save.mon.dayBest = 0;
     }
     useRun(r);
-    hideLobby(true);
     setControls(true);
     setMusic('race');
     soloScreen('Monsoon');
@@ -799,18 +754,16 @@ async function boot() {
 
   // ------------------------------------------------------------ the match
 
-  function onPhase(p, prev) {
-    if (p === 'intro' || p === 'round') {
+  function onPhase(p) {
+    if (p === 'round') {
       if (amRacing()) {
         if (flow !== 'race') enterRace();
       } else if (flow === 'lobby' || flow === 'spouts' || flow === 'wardrobe') enterRace();
-      if (p === 'intro') showSpoutTag();
-      if (p === 'round' && flow === 'race') {
-        ui.show('race', () => {});
-        if (prev === 'intro') {
-          count = { text: 'GO', age: 0 };
-          sfx('go');
-        }
+      showSpoutTag();
+      // Ready was pressed on the platform's page: try for the sound now (the first key or touch makes sure of it)
+      if (flow === 'race' && (match.elapsed ?? 0) < 1500) {
+        startAudio();
+        sfx('go');
       }
     } else if (p === 'roundEnd') {
       if (flow === 'race') showRoundEnd();
@@ -821,7 +774,6 @@ async function boot() {
       if (flow === 'race') toLobby();
       else if (flow === 'lobby') refreshLobby();
     }
-    if (flow === 'race') hideLobby(true);
   }
 
   function enterRace() {
@@ -831,7 +783,6 @@ async function boot() {
     solo = null;
     mon = null;
     roundShown = '';
-    hideLobby(true);
     setMusic('race');
     setControls(amRacing());
     blurButtons();
@@ -850,7 +801,7 @@ async function boot() {
       el.append(
         tag(h('span', { class: 'stack' }, h('span', { class: 'big', text: s.name }), h('span', { class: 'sub' }, ...cup.spouts.map((sid, i) => h('span', { class: sid === s.id ? 'lit' : '', text: `${i ? ' · ' : ''}${spoutById(sid).name}` })))), {
           silk: 34,
-          cls: 'spoutname',
+          cls: 'spoutname fade',
         }),
       ),
     );
@@ -873,6 +824,7 @@ async function boot() {
     last.ranking.forEach((g, i) => g.includes(me?.id) && (myPlace = i + 1));
     let reward = null;
     if (me && !match.spectating && !STAGE) {
+      save.tut = true;
       save.n.races++;
       const mine = curRun?.me;
       if (myPlace === 1) {
@@ -951,9 +903,7 @@ async function boot() {
           }),
         );
       });
-      const isHost = room?.isHost && room.kind !== 'public' && match.isHost;
-      const end = isHost ? tag(h('span', { class: 'withsecs' }, 'Lobby', secsEl()), { main: true, silk: 16, onclick: () => safe(() => match.skip()), cls: 'continue' }) : nextLine('Lobby');
-      el.append(h('div', { class: 'cuptable' }, pod, h('div', { class: 'tablecol' }, rest, end)));
+      el.append(h('div', { class: 'cuptable' }, pod, h('div', { class: 'tablecol' }, rest, nextLine('Lobby'))));
     });
     if (top[0] && curRun) {
       const r = curRun.byId.get(top[0].id);
@@ -1612,7 +1562,6 @@ async function boot() {
     if (area) return { x: area.x + area.w * (target === 'buttons' ? 0.7 : 0.5), y: area.y + area.h * 0.5 };
     if (target === 'buttons') return { x: W - 80, y: HGT - 90 };
     if (target === 'stick') return { x: 90, y: HGT - 110 };
-    if (target === 'lobby') return { x: W / 2, y: HGT - 44 };
     return null;
   }
 
@@ -1626,7 +1575,8 @@ async function boot() {
   function playHints(r, dt) {
     const sp = r.sp;
     if (!sp || !curRun || r.finish) return;
-    const tut = solo?.tutorial;
+    // the tutorial, or a first race for someone who went straight to Ready
+    const tut = solo?.tutorial || !save.tut;
     if (tut && sp.y < 120 && curRun.t > 0.3) showHint('climb', 'Up to climb', 'Push up to climb', { target: 'stick', life: 3 });
     rainAt(curRun.weather, sp.y, curRun.t, rinfo);
     if (rinfo.warn && rinfo.next > 0.9) showHint('rain', 'Rain coming', 'Rain coming', { life: 1.4 });
@@ -1688,12 +1638,7 @@ async function boot() {
     let lean = 0;
     let rise = 95;
     let topShot = false;
-    if (flow === 'title' && attract) {
-      let best = null;
-      for (const r of attract.racers) if (!best || r.st.y > best.st.y) best = r;
-      ty = (best?.st.y ?? 0) + vh * lead;
-      viewH = vh * 1.1;
-    } else if (flow === 'lobby' || flow === 'spouts') {
+    if (flow === 'lobby' || flow === 'spouts') {
       // the spiders on the drain, big: the pipe's width across a tall screen, close on a wide one
       viewH = W > HGT ? 250 : (PIPE_W + 50) / Math.max(0.3, W / HGT);
       ty = W > HGT ? viewH * 0.2 : -viewH * 0.1;
@@ -1740,14 +1685,7 @@ async function boot() {
       for (const r of curRun.racers) if (!r.left && (!best || r.st.y > best.st.y)) best = r;
       ty = (best?.st.y ?? 0) + vh * lead;
     }
-    if (flow === 'race' && match?.phase === 'intro') {
-      const k = clamp(1 - (match.secondsLeft ?? 0) / INTRO, 0, 1);
-      const e = k < 0.45 ? 0 : clamp((k - 0.45) / 0.35, 0, 1);
-      const ease = e * e * (3 - 2 * e);
-      ty = (H - vh * 0.3) * (1 - ease) + ty * ease;
-      viewH = vh * (1.6 - 0.6 * ease);
-      camSnap = k < 0.05;
-    } else if (flyover) {
+    if (flyover) {
       flyover.t += dt;
       const e = clamp(flyover.t / flyover.dur, 0, 1);
       const ease = e * e * (3 - 2 * e);
@@ -1765,7 +1703,6 @@ async function boot() {
   // ------------------------------------------------------------ the loop
 
   let lastReal = performance.now() / 1000;
-  let lastCount = '';
   let gloom = 0;
   let calm = 1;
   const hudState = {};
@@ -1872,12 +1809,7 @@ async function boot() {
       if (flow === 'race' && net.round && curRun !== net.round.run) useRun(net.round.run);
       if (flow === 'race' && me && curRun === net.round?.run) myEvents(me);
     }
-    if (flow === 'title' && attract) {
-      advance(attract, attract.t + simDt, null, { onHazard: (r, k) => onScreen(r) && hazardFx(r, k), onFly: (r, f) => onScreen(r) && fx.glint(f.x, f.y, 0, 6) });
-      const done = attract.racers.some((r) => r.finish);
-      if (done && !attract.until) attract.until = real + 4;
-      if ((attract.until && real > attract.until) || attract.t > 160) newAttract();
-    } else if ((flow === 'solo' || flow === 'solo-done') && curRun && !paused) {
+    if ((flow === 'solo' || flow === 'solo-done') && curRun && !paused) {
       const me = curRun.me;
       if (!flyover || flow === 'solo-done') {
         const inp = flow === 'solo' && !me.finish ? (AUTOPLAY ? autoInput(me) : input.read()) : idle();
@@ -1909,7 +1841,6 @@ async function boot() {
     }
     if (AUTOPLAY) autoplayDriver(real);
     if (hint.text) hint.age += dt;
-    if (count) count.age += dt;
     for (const p of pops) p.age += dt;
     while (pops.length && pops[0].age > pops[0].life) pops.shift();
   }
@@ -1969,7 +1900,7 @@ async function boot() {
     frameRacers.length = 0;
     for (const r of run.racers) {
       let st = drawState(run, r);
-      if (r.finish && st.m === 'done' && run.kind !== 'lobby' && run.kind !== 'attract') st = onTheGutter(run, r, st);
+      if (r.finish && st.m === 'done' && run.kind !== 'lobby') st = onTheGutter(run, r, st);
       frameRacers.push({ id: r.id, look: r.look, st, ghost: false, wet: false, hidden: r.left && !r.finish && run.kind === 'race' });
     }
     // ---- camera
@@ -2058,7 +1989,7 @@ async function boot() {
   }
 
   function weatherSounds(run, warnK, real, sunny) {
-    if (run.kind === 'lobby' || flow === 'title' || flow === 'closed' || flow === 'wardrobe' || flow === 'spouts' || sunny) {
+    if (run.kind === 'lobby' || flow === 'closed' || flow === 'wardrobe' || flow === 'spouts' || sunny) {
       setRain(sunny ? 0.15 + 0.6 * gloom : 0.25);
       setMusicWeather('sun');
       return;
@@ -2102,7 +2033,7 @@ async function boot() {
     hs.layout = layout;
     hs.reduced = reduced();
     hs.touch = touchMode();
-    for (const k of ['label', 'sub', 'subColor', 'line', 'me', 'names', 'hint', 'countdown', 'debris', 'ring', 'target', 'flies', 'pops']) hs[k] = null;
+    for (const k of ['label', 'sub', 'subColor', 'line', 'me', 'names', 'hint', 'debris', 'ring', 'target', 'flies', 'pops']) hs[k] = null;
     const showWeather = flow === 'solo' || flow === 'monsoon' || flow === 'race' || flow === 'solo-done' || flow === 'monsoon-done';
     const proj = (x, y) => view.project(x, y, 0, {});
     if (!showWeather) {
@@ -2112,7 +2043,7 @@ async function boot() {
         for (const r of run.racers) {
           const info = run.seatsInfo?.find((s) => s.id === r.id);
           const p = proj(r.st.x, r.st.y + 6);
-          hs.names.push({ name: r.name, sx: p.x, sy: p.y - 10, color: info?.bot ? 'rgba(243,237,226,0.6)' : info?.me ? '#FFB648' : '#F3EDE2', ready: !info?.bot && !!info?.ready });
+          hs.names.push({ name: r.name, sx: p.x, sy: p.y - 10, color: info?.bot ? 'rgba(243,237,226,0.6)' : info?.me ? '#FFB648' : '#F3EDE2' });
         }
         if (hint.text && hint.age < hint.life) hs.hint = { ...hint, x: W / 2, y: HGT * 0.42, target: hintTarget(hint.target) };
       }
@@ -2203,21 +2134,6 @@ async function boot() {
       const p = proj(meDraw.x, meDraw.y);
       hs.hint = { ...hint, x: clamp(p.x, 140, W - 140), y: clamp(p.y - 110, 70, HGT - 160), target: hintTarget(hint.target) };
     }
-    if (flow === 'race' && match?.phase === 'intro') {
-      const left = match.secondsLeft ?? 0;
-      if (left <= 3) {
-        const n = Math.max(1, Math.ceil(left));
-        const text = String(n);
-        if (text !== lastCount) {
-          lastCount = text;
-          sfx('count', n === 1 ? 1 : 0);
-        }
-        hs.countdown = { text, k: 1 - (left - (n - 1)) };
-      }
-    } else if (count && count.age < 0.8) {
-      hs.countdown = { text: count.text, k: count.age / 0.8 };
-      lastCount = '';
-    }
     return hs;
   }
 
@@ -2228,7 +2144,6 @@ async function boot() {
   function autoplayDriver(real) {
     if (real < autoAt) return;
     autoAt = real + 0.5;
-    if (flow === 'title') play();
     if (flow !== 'lobby' || !room || !match) return;
     const want = Number(params.get('cup')) || 0;
     if (want && !autoCup && room.isHost) {
@@ -2371,7 +2286,7 @@ async function boot() {
       camSnap = true;
       if (final) showCupResults();
       else showRoundEnd();
-    } else showTitle();
+    } else toLobby();
     await new Promise((r) => setTimeout(r, settle));
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     document.body.dataset.ready = '1';
@@ -2479,8 +2394,16 @@ async function boot() {
     save.open = Math.max(save.open, Number(params.get('view')) || 1);
     startSolo(Number(params.get('view')) || 1, false);
     flyover = null;
-  } else if (inRacePhase() && amRacing()) enterRace();
-  else showTitle();
-  if (inRacePhase() && match.phase === 'intro') showSpoutTag();
+  } else if (inRacePhase() && amRacing()) {
+    enterRace();
+    if (match.phase === 'round') showSpoutTag();
+  } else if (inRacePhase()) {
+    // A latecomer watches the race under way, then has the lobby.
+    enterRace();
+  } else {
+    toLobby();
+    // a save that took longer than the wait above: the lobby shows it once it's here
+    loadSaves.then(() => flow === 'lobby' && refreshLobby(true));
+  }
   document.body.dataset.flow = 'ready';
 }
